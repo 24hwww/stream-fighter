@@ -1,0 +1,8 @@
+{
+    "name": "stream-fighter-root",
+    "description": "Arena de Versus generada por IA 24/7",
+    "private": true,
+    "scripts": {
+        "info": "Este es un proyecto multi-contenedor. Por favor, usa Docker Compose para desplegarlo."
+    }
+}

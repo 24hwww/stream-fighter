@@ -6,11 +6,12 @@ services:
     restart: unless-stopped
     volumes:
       - ./app:/app
-      - /app/node_modules
+    env_file:
+      - .env
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 1024M
 
   streamer:
     build: ./streamer

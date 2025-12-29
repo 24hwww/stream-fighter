@@ -1,3 +1,4 @@
+#!/bin/bash
 # Silence DBUS and Accessibility warnings
 export NO_AT_BRIDGE=1
 export DBUS_SESSION_BUS_ADDRESS=/dev/null

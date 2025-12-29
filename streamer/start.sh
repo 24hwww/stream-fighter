@@ -29,9 +29,6 @@ pkill chromium || true
 rm -rf /tmp/chrome-user-data*
 
 mkdir -p /tmp/chrome-user-data
-echo "Starting Background Music..."
-ffplay -nodisp -loop 0 melody.wav > /dev/null 2>&1 &
-
 echo "Starting Chromium..."
 TARGET_URL=${TARGET_URL:-"http://webapp:3000"}
 chromium \

@@ -11,6 +11,6 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /stream
-COPY . .
+COPY start.sh .
 RUN chmod +x start.sh
 CMD ["bash", "start.sh"]

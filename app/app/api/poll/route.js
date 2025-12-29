@@ -11,9 +11,7 @@ export async function GET() {
             poll = await PollService.rotatePoll("General");
         }
 
-        const previous = await PollService.getPreviousPoll();
-
-        return NextResponse.json({ current: poll, previous });
+        return NextResponse.json(poll);
     } catch (error) {
         console.error("Poll API Error:", error);
 

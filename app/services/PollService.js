@@ -5,7 +5,11 @@ export class PollService {
     static async getCurrentPoll() {
         return await prisma.poll.findFirst({
             where: { active: true },
-            include: { optionA: true, optionB: true, category: true },
+            include: {
+                optionA: { include: { _count: { select: { votes: true } } } },
+                optionB: { include: { _count: { select: { votes: true } } } },
+                category: true
+            },
             orderBy: { createdAt: 'desc' }
         });
     }
@@ -33,16 +37,33 @@ export class PollService {
                 category: { connect: { id: category.id } },
                 expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
                 optionA: {
-                    create: { name: aiData.optionA.name, image: aiData.optionA.image || null }
+                    create: {
+                        name: aiData.optionA.name,
+                        image: aiData.optionA.image ? `https://loremflickr.com/800/800/${encodeURIComponent(aiData.optionA.image)}?lock=${Math.floor(Math.random() * 1000)}` : null
+                    }
                 },
                 optionB: {
-                    create: { name: aiData.optionB.name, image: aiData.optionB.image || null }
+                    create: {
+                        name: aiData.optionB.name,
+                        image: aiData.optionB.image ? `https://loremflickr.com/800/800/${encodeURIComponent(aiData.optionB.image)}?lock=${Math.floor(Math.random() * 1000)}` : null
+                    }
                 }
             },
             include: { optionA: true, optionB: true, category: true }
         });
 
         return newPoll;
+    }
+
+    static async getPreviousPoll() {
+        return await prisma.poll.findFirst({
+            where: { active: false },
+            include: {
+                optionA: { include: { _count: { select: { votes: true } } } },
+                optionB: { include: { _count: { select: { votes: true } } } }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
     }
 
     static async registerVote(pollId, optionId) {

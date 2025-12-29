@@ -60,7 +60,9 @@ export default function MobileVoting() {
         );
     }
 
-    if (!poll) return <div className="text-white p-10">No hay encuestas activas.</div>;
+    if (!poll?.current) return <div className="text-white p-10 uppercase font-black italic opacity-20">Esperando versus...</div>;
+
+    const currentPoll = poll.current;
 
     return (
         <div className="flex flex-col min-h-screen bg-zinc-950 text-white p-6 font-sans">
@@ -73,7 +75,8 @@ export default function MobileVoting() {
 
             <div className="flex-1 flex flex-col gap-6 justify-center max-w-sm mx-auto w-full">
                 <button
-                    onClick={() => handleVote(poll.optionAId, poll.optionA.name)}
+                    id="vote-option-a"
+                    onClick={() => handleVote(currentPoll.optionA.id, currentPoll.optionA.name)}
                     disabled={submitting}
                     className="group relative disabled:opacity-50"
                 >
@@ -81,7 +84,7 @@ export default function MobileVoting() {
                         <div className="bg-purple-500 p-4 rounded-xl shadow-[0_0_20px_rgba(168,85,247,0.3)]">
                             <Star fill="white" size={32} />
                         </div>
-                        <div className="text-left font-black italic text-2xl uppercase text-purple-400">Votar {poll.optionA.name}</div>
+                        <div className="text-left font-black italic text-2xl uppercase text-purple-400">Votar {currentPoll.optionA.name}</div>
                     </div>
                 </button>
 
@@ -92,7 +95,8 @@ export default function MobileVoting() {
                 </div>
 
                 <button
-                    onClick={() => handleVote(poll.optionBId, poll.optionB.name)}
+                    id="vote-option-b"
+                    onClick={() => handleVote(currentPoll.optionB.id, currentPoll.optionB.name)}
                     disabled={submitting}
                     className="group relative disabled:opacity-50"
                 >
@@ -100,7 +104,7 @@ export default function MobileVoting() {
                         <div className="bg-orange-500 p-4 rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.3)]">
                             <Heart fill="white" size={32} />
                         </div>
-                        <div className="text-left font-black italic text-2xl uppercase text-orange-400">Votar {poll.optionB.name}</div>
+                        <div className="text-left font-black italic text-2xl uppercase text-orange-400">Votar {currentPoll.optionB.name}</div>
                     </div>
                 </button>
             </div>

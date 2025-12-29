@@ -6,36 +6,46 @@ import { QRCodeSVG } from "qrcode.react";
 export default function Footer() {
     const [timeLeft, setTimeLeft] = useState(0);
     const [origin, setOrigin] = useState("");
+    const [previousResult, setPreviousResult] = useState(null);
 
-    const updateCountdown = async () => {
+    const updateData = async () => {
         try {
             const res = await fetch("/api/poll");
-            const poll = await res.json();
-            if (poll && poll.expiresAt) {
+            const data = await res.json();
+
+            if (data.current) {
                 setOrigin(window.location.origin);
-                const expires = new Date(poll.expiresAt).getTime();
+                const expires = new Date(data.current.expiresAt).getTime();
                 const now = new Date().getTime();
                 const diff = Math.max(0, Math.floor((expires - now) / 1000));
                 setTimeLeft(diff);
+                if (diff <= 0) window.dispatchEvent(new Event("poll-expired"));
+            }
+
+            if (data.previous) {
+                const vA = data.previous.optionA?._count?.votes || 0;
+                const vB = data.previous.optionB?._count?.votes || 0;
+                const total = vA + vB;
+                if (total > 0) {
+                    const winner = vA >= vB ? data.previous.optionA : data.previous.optionB;
+                    const winPercent = Math.round((Math.max(vA, vB) / total) * 100);
+                    setPreviousResult({ name: winner.name, percent: winPercent });
+                } else {
+                    setPreviousResult({ name: "Empate/Sin Votos", percent: 0 });
+                }
             }
         } catch (err) {
-            console.error("Footer countdown error:", err);
+            console.error("Footer update error:", err);
         }
     };
 
     useEffect(() => {
-        updateCountdown();
+        updateData();
         const timer = setInterval(() => {
             setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
         }, 1000);
-
-        // Sync with server every 30 seconds
-        const sync = setInterval(updateCountdown, 30000);
-
-        return () => {
-            clearInterval(timer);
-            clearInterval(sync);
-        };
+        const sync = setInterval(updateData, 10000); // More frequent sync for results
+        return () => { clearInterval(timer); clearInterval(sync); };
     }, []);
 
     const formatTime = (seconds) => {
@@ -45,26 +55,38 @@ export default function Footer() {
     };
 
     return (
-        <div className="flex items-center justify-between w-full h-full px-6 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-md">
-            {/* Timer */}
-            <div className="flex flex-col">
-                <span className="text-zinc-500 font-mono text-xs uppercase tracking-widest flex items-center gap-2">
-                    <Clock size={12} /> Próxima Encuesta en
+        <div className="flex items-center justify-between w-full h-full px-8 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-md overflow-hidden relative">
+            {/* Result of Previous Poll */}
+            <div className="flex flex-col border-r border-white/10 pr-8">
+                <span className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest flex items-center gap-2">
+                    🏆 Ganador Anterior
                 </span>
-                <div className="text-6xl font-mono font-bold tabular-nums text-white">
-                    {timeLeft > 0 ? formatTime(timeLeft) : "0:00"}
+                <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-black italic text-yellow-500 uppercase truncate max-w-[150px]">
+                        {previousResult?.name || "---"}
+                    </span>
+                    <span className="text-sm font-bold text-white/40">{previousResult?.percent}%</span>
+                </div>
+            </div>
+
+            {/* Timer */}
+            <div className="flex flex-col items-center flex-1">
+                <span className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest flex items-center gap-2">
+                    <Clock size={10} /> Siguiente Ronda
+                </span>
+                <div className="text-5xl font-mono font-black tabular-nums text-white tracking-widest">
+                    {formatTime(timeLeft)}
                 </div>
             </div>
 
             {/* Voting QR */}
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-6 pl-8 border-l border-white/10">
                 <div className="flex flex-col text-right">
-                    <span className="text-blue-400 font-bold uppercase text-base">¿Quieres votar?</span>
-                    <span className="text-white/60 text-sm italic">Escanea para elegir ganador</span>
-                    <span className="text-white/40 text-xs mt-1 font-mono italic">/vote</span>
+                    <span className="text-blue-400 font-black uppercase text-sm italic">Vota Ahora</span>
+                    <span className="text-white/40 text-[10px] mt-1 font-mono italic">/vote</span>
                 </div>
-                <div className="p-2 bg-white rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.1)]">
-                    {origin && <QRCodeSVG value={`${origin}/vote`} size={100} level="H" />}
+                <div className="p-2 bg-white rounded-lg">
+                    {origin && <QRCodeSVG value={`${origin}/vote`} size={60} level="H" />}
                 </div>
             </div>
         </div>

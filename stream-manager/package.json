@@ -1,0 +1,14 @@
+{
+    "name": "stream-manager",
+    "version": "1.0.0",
+    "description": "API to dynamically manage streamer containers",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js"
+    },
+    "dependencies": {
+        "cors": "^2.8.5",
+        "dockerode": "^4.0.2",
+        "express": "^4.18.2"
+    }
+}

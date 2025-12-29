@@ -1,0 +1,42 @@
+services:
+  webapp:
+    build: ./app
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    volumes:
+      - ./app:/app
+      - /app/node_modules
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  streamer:
+    build: ./streamer
+    env_file:
+      - .env
+    depends_on:
+      - webapp
+      - restreamer
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+
+  restreamer:
+    image: datarhei/restreamer:latest
+    ports:
+      - "8080:8080"
+      - "1935:1935"
+    volumes:
+      - restreamer-data:/core/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+volumes:
+  restreamer-data:

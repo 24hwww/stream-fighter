@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Next.js
+.next/
+out/
+
+# Production
+build/
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment Variables
+.env
+*.env
+.env*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+*.lock
+
+# Streamer specific
+streamer/chrome-user-data/
+streamer/melody.wav
+/tmp/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# GitHub Actions Runner
+actions-runner/

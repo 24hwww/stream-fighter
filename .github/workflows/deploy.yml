@@ -1,0 +1,15 @@
+name: CD - Update Local Files
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  update:
+    runs-on: self-hosted  # Esto le dice a GitHub que use tu servidor
+    steps:
+      - name: Pull latest changes
+        run: |
+          cd /home/soporte24hwww/Descargas/stream-fighter
+          git pull origin main

@@ -8,36 +8,16 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    shm_size: '512mb'
     healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/api/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
     deploy:
       resources:
         limits:
-          memory: 1024M
-
-  streamer:
-    image: stream-fighter-streamer:latest
-    build:
-      context: ./streamer
-      dockerfile: Dockerfile
-    env_file:
-      - .env
-    depends_on:
-      stream-screen:
-        condition: service_healthy
-      restreamer:
-        condition: service_started
-    environment:
-      - TARGET_URL=http://stream-screen:3000
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1024M
+          memory: 2048M
 
   stream-manager:
     build:

@@ -37,58 +37,34 @@ app.get('/list', async (req, res) => {
     }
 });
 
+const axios = require('axios');
+const SCREEN_API_URL = process.env.SCREEN_API_URL || 'http://stream-screen:3000/api/stream';
+
 // Start a dynamic streamer
 app.post('/start', async (req, res) => {
-    const { streamKey, targetUrl } = req.body;
+    const { streamKey, screenId } = req.body;
 
-    if (!streamKey || !targetUrl) {
-        return res.status(400).json({ error: 'Missing streamKey or targetUrl' });
+    if (!streamKey || !screenId) {
+        return res.status(400).json({ error: 'Missing streamKey or screenId' });
     }
-
-    const containerName = `streamer-dynamic-${streamKey}`;
 
     try {
-        // Check if already running
-        const existing = await docker.listContainers({ filters: { name: [containerName] } });
-        if (existing.length > 0) {
-            return res.status(409).json({ error: 'Streamer for this key already exists', containerId: existing[0].Id });
-        }
-
-        // Get network ID to connect (using the first network of the manager usually works if in same compose)
-        // Or we rely on the hardcoded network name. 
-        // Better: inspect self to find network? For simplicity, we use the predictable compose network name.
-
-        // Get environment variables passed from this manager or defaults
-        // We need: RTMP_URL (usually internal restreamer URL)
-        const RTMP_URL = process.env.RTMP_URL || 'rtmp://restreamer:1935/live';
-
-        const container = await docker.createContainer({
-            Image: STREAMER_IMAGE,
-            name: containerName,
-            Env: [
-                `STREAM_KEY=${streamKey}`,
-                `TARGET_URL=${targetUrl}`,
-                `RTMP_URL=${RTMP_URL}`,
-                // Pass other necessary secrets if needed, but for now we assume they are baked or standard
-            ],
-            HostConfig: {
-                NetworkMode: NETWORK_NAME, // Important to connect to webapp and restreamer
-                AutoRemove: true, // Ephemeral: remove when stopped
-                ShmSize: 268435456, // 256MB SHM for Chrome
-                Memory: 1024 * 1024 * 1024, // 1GB Limit
-            }
+        console.log(`Forwarding start request to ${SCREEN_API_URL} for ${streamKey}`);
+        const response = await axios.post(SCREEN_API_URL, {
+            screenId: screenId,
+            streamKey: streamKey
         });
 
-        await container.start();
-        console.log(`Started container ${containerName}`);
-
-        res.json({ status: 'started', containerId: container.id, name: containerName });
-
+        res.json(response.data);
     } catch (error) {
-        console.error("Start error:", error);
-        res.status(500).json({ error: error.message });
+        console.error("Start error:", error.response?.data || error.message);
+        res.status(500).json({
+            error: 'Failed to start stream in stream-screen',
+            details: error.response?.data || error.message
+        });
     }
 });
+
 
 // Stop a dynamic streamer
 app.post('/stop', async (req, res) => {
@@ -98,27 +74,19 @@ app.post('/stop', async (req, res) => {
         return res.status(400).json({ error: 'Missing streamKey' });
     }
 
-    const containerName = `streamer-dynamic-${streamKey}`;
-
     try {
-        const container = docker.getContainer(containerName);
-
-        // Inspect checks if it exists
-        try {
-            await container.inspect();
-        } catch (e) {
-            return res.status(404).json({ error: 'Container not found' });
-        }
-
-        await container.stop(); // AutoRemove will handle deletion
-
-        res.json({ status: 'stopped', name: containerName });
-
+        console.log(`Forwarding stop request for ${streamKey}`);
+        const response = await axios.delete(`${SCREEN_API_URL}?streamKey=${streamKey}`);
+        res.json(response.data);
     } catch (error) {
-        console.error("Stop error:", error);
-        res.status(500).json({ error: error.message });
+        console.error("Stop error:", error.response?.data || error.message);
+        res.status(500).json({
+            error: 'Failed to stop stream in stream-screen',
+            details: error.response?.data || error.message
+        });
     }
 });
+
 
 app.listen(PORT, () => {
     console.log(`Stream Manager running on port ${PORT}`);

@@ -1,6 +1,9 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Star, Heart, CheckCircle2, Loader2 } from "lucide-react";
+import { io } from "socket.io-client";
+
+const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001");
 
 export default function MobileVoting() {
     const [poll, setPoll] = useState(null);
@@ -8,13 +11,25 @@ export default function MobileVoting() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
 
-    useEffect(() => {
+    const fetchPoll = () => {
         fetch("/api/poll")
             .then(res => res.json())
             .then(data => {
                 if (!data.error) setPoll(data);
                 setLoading(false);
             });
+    }
+
+    useEffect(() => {
+        fetchPoll();
+        socket.on("poll-refresh", () => {
+            fetchPoll();
+            setVoted(null); // Reset vote for new poll
+        });
+
+        return () => {
+            socket.off("poll-refresh");
+        };
     }, []);
 
     const handleVote = async (optionId, optionName) => {

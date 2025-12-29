@@ -11,19 +11,20 @@ export async function GET() {
             poll = await PollService.rotatePoll("General");
         }
 
-        return NextResponse.json(poll);
+        const previous = await PollService.getPreviousPoll();
+        return NextResponse.json({ current: poll, previous });
     } catch (error) {
         console.error("Poll API Error:", error);
 
         // Fallback data so the stream doesn't break
         const fallbackPoll = {
             id: "fallback",
-            optionA: { name: "Batman", image: "/option_a.png" },
-            optionB: { name: "Superman", image: "/option_b.png" },
+            optionA: { name: "Batman", image: "/option_a.png", _count: { votes: 0 } },
+            optionB: { name: "Superman", image: "/option_b.png", _count: { votes: 0 } },
             expiresAt: new Date(Date.now() + 300000).toISOString(), // 5 mins
             isFallback: true
         };
 
-        return NextResponse.json(fallbackPoll);
+        return NextResponse.json({ current: fallbackPoll, previous: null });
     }
 }

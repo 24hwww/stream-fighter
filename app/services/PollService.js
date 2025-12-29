@@ -30,7 +30,7 @@ export class PollService {
         // 4. Create new poll with the options
         const newPoll = await prisma.poll.create({
             data: {
-                categoryId: category.id,
+                category: { connect: { id: category.id } },
                 expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
                 optionA: {
                     create: { name: aiData.optionA.name, image: aiData.optionA.image || null }

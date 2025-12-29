@@ -5,7 +5,7 @@ export const openrouter = createOpenRouter({
     apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-export const aiModel = openrouter('google/gemini-2.0-flash-001'); // Reliable and fast model
+export const aiModel = openrouter(process.env.OPENROUTER_MODEL?.split(',')[0] || 'google/gemini-2.0-flash-001');
 
 export async function generateNewPoll(categoryName) {
     const prompt = `Generate a versus poll for the category: ${categoryName}. 
@@ -18,5 +18,7 @@ export async function generateNewPoll(categoryName) {
         prompt: prompt,
     });
 
-    return JSON.parse(text);
+    // Clean output for markdown blocks
+    const cleanText = text.replace(/```json|```/g, "").trim();
+    return JSON.parse(cleanText);
 }

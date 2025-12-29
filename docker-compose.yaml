@@ -2,7 +2,7 @@ services:
   webapp:
     build: ./app
     ports:
-      - "3000:3000"
+      - "3010:3000"
     restart: unless-stopped
     volumes:
       - ./app:/app
@@ -29,7 +29,7 @@ services:
   restreamer:
     image: datarhei/restreamer:latest
     ports:
-      - "8080:8080"
+      - "8181:8080"
       - "1935:1935"
     volumes:
       - restreamer-data:/core/data
@@ -42,7 +42,7 @@ services:
   socket:
     build: ./socket
     ports:
-      - "3001:3001"
+      - "3011:3001"
     restart: unless-stopped
     deploy:
       resources:

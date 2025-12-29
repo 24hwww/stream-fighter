@@ -38,7 +38,8 @@ export class PollService {
                 optionB: {
                     create: { name: aiData.optionB.name, image: aiData.optionB.image || null }
                 }
-            }
+            },
+            include: { optionA: true, optionB: true, category: true }
         });
 
         return newPoll;

@@ -7,6 +7,11 @@ export const openrouter = createOpenRouter({
 
 export const aiModel = openrouter(process.env.OPENROUTER_MODEL?.split(',')[0] || 'google/gemini-2.0-flash-001');
 
+// Add specificationVersion to silence the AI SDK warning
+if (aiModel && !aiModel.specificationVersion) {
+    aiModel.specificationVersion = 'v1';
+}
+
 export async function generateNewPoll(categoryName) {
     const prompt = `Generate a versus poll for the category: ${categoryName}. 
   Provide two contrasting options with a short name and a description of why they are competing.

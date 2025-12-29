@@ -1,6 +1,8 @@
 services:
   webapp:
-    build: ./app
+    build:
+      context: ./app
+      dockerfile: Dockerfile
     ports:
       - "3010:3000"
     restart: unless-stopped
@@ -18,7 +20,9 @@ services:
           memory: 1024M
 
   streamer:
-    build: ./streamer
+    build:
+      context: ./streamer
+      dockerfile: Dockerfile
     env_file:
       - .env
     depends_on:
@@ -46,7 +50,9 @@ services:
           memory: 512M
 
   socket:
-    build: ./socket
+    build:
+      context: ./socket
+      dockerfile: Dockerfile
     ports:
       - "3011:3001"
     restart: unless-stopped

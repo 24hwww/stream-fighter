@@ -1,9 +1,9 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Trophy, Users } from "lucide-react";
-import { io } from "socket.io-client";
+import { createSocketClient } from "@/lib/socketClient";
 
-const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:3001`);
+const socket = createSocketClient();
 
 export default function Footer() {
     const [stats, setStats] = useState({ current: null, previous: null });

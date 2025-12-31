@@ -1,10 +1,9 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import { io } from "socket.io-client";
+import { createSocketClient } from "@/lib/socketClient";
 
-// Connect to the socket server - Use window.location.hostname for environment flexibility
-const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:3001`);
+const socket = createSocketClient();
 
 export default function PollSection() {
     const [poll, setPoll] = useState(null);
@@ -37,8 +36,8 @@ export default function PollSection() {
             fetchPoll(false); // Silent refresh to update vote counts
         });
 
-        socket.on("poll-update", () => {
-            console.log("Real-time poll rotation received");
+        socket.on("poll-refresh", (data) => {
+            console.log("Real-time poll rotation received:", data);
             fetchPoll(true);
         });
 
@@ -82,10 +81,15 @@ export default function PollSection() {
 
     return (
         <div className="relative flex flex-col items-center justify-center gap-8 w-full animate-in fade-in duration-1000">
-            {loading && (
-                <div className="absolute inset-x-0 -top-12 flex justify-center z-50">
-                    <div className="bg-purple-600 px-4 py-1 rounded-full text-[10px] font-black uppercase italic tracking-widest animate-bounce shadow-lg">
-                        IA Actulizando...
+            {/* Global Rotation Spinner Overlay */}
+            {loading && poll && (
+                <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-md rounded-3xl animate-in zoom-in-95 duration-500">
+                    <div className="relative">
+                        <Loader2 className="w-20 h-20 text-purple-500 animate-spin" />
+                        <Zap className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-orange-500 animate-pulse" size={32} />
+                    </div>
+                    <div className="mt-6 text-2xl font-black italic uppercase tracking-[0.3em] text-white text-center">
+                        <span className="text-purple-400">IA</span> ACTUALIZANDO <span className="text-orange-400">GUERREROS</span>
                     </div>
                 </div>
             )}

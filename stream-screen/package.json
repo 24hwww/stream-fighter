@@ -9,14 +9,17 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.60",
     "@openrouter/ai-sdk-provider": "^1.5.4",
     "@prisma/client": "^6.19.1",
     "@supabase/supabase-js": "^2.78.0",
     "ai": "^5.0.0",
     "axios": "^1.13.2",
+    "ioredis": "^5.8.2",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "prisma": "^6.19.1",
+    "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",

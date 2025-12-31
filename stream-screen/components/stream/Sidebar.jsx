@@ -8,8 +8,38 @@ export default function Sidebar() {
   const [voteUrl, setVoteUrl] = React.useState("");
 
   React.useEffect(() => {
-    setOrigin(window.location.origin);
-    setVoteUrl(window.location.origin + "/vote");
+    // Get base URL from API to ensure it uses network IP
+    const fetchBaseUrl = async () => {
+      try {
+        const res = await fetch("/api/base-url");
+        const data = await res.json();
+        if (data.baseUrl) {
+          setVoteUrl(data.baseUrl + "/vote");
+        } else {
+          // Fallback to current origin
+          const origin = window.location.origin;
+          // Replace localhost with network IP if available
+          const networkIp = data.networkIp;
+          if (networkIp && origin.includes('localhost')) {
+            setVoteUrl(`http://${networkIp}:3010/vote`);
+          } else {
+            setVoteUrl(origin + "/vote");
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching base URL:", err);
+        // Fallback: try to use hostname (works if accessed via network IP)
+        const hostname = window.location.hostname;
+        const port = window.location.port || '3010';
+        if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+          setVoteUrl(`http://${hostname}:${port}/vote`);
+        } else {
+          setVoteUrl(window.location.origin + "/vote");
+        }
+      }
+    };
+    
+    fetchBaseUrl();
   }, []);
 
   const [origin, setOrigin] = React.useState("");

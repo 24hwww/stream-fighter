@@ -17,10 +17,26 @@ class StreamService {
             return { status: 'already_running', streamKey };
         }
 
-        const display = `:${this.displayCounter++}`;
-        const targetUrl = `http://localhost:3000/screen/${screenId}`;
         const rtmpBaseUrl = process.env.RTMP_URL || 'rtmp://restreamer:1935/live';
         const rtmpUrl = `${rtmpBaseUrl}/${streamKey}`;
+
+        // Usar Canvas renderer si está disponible (más eficiente)
+        const useCanvas = process.env.USE_CANVAS_RENDERER !== 'false';
+        
+        if (useCanvas) {
+            try {
+                console.log(`[StreamService] Using Canvas renderer for ${streamKey}`);
+                const { canvasStreamService } = await import('./canvasStreamService.js');
+                return await canvasStreamService.startStream(screenId, streamKey);
+            } catch (e) {
+                console.warn(`[StreamService] Canvas renderer failed, falling back to Chromium:`, e.message);
+            }
+        }
+
+        // Fallback a Chromium (método original)
+        console.log(`[StreamService] Using Chromium renderer for ${streamKey}`);
+        const display = `:${this.displayCounter++}`;
+        const targetUrl = `http://localhost:3000/screen/${screenId}`;
 
         console.log(`[StreamService] Starting stream: id=${screenId}, key=${streamKey}, display=${display}`);
 

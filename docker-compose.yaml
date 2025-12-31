@@ -1,43 +1,66 @@
+version: "3.9"
+
 services:
   stream-screen:
     build:
       context: ./stream-screen
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
       - "3010:3000"
-    restart: unless-stopped
+    volumes:
+      - ./stream-screen:/app
+      - /app/node_modules
+      - /app/.next
     env_file:
       - .env
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+      - NETWORK_IP=10.0.0.15
+      - USE_CANVAS_RENDERER=true
+      - NEXT_PUBLIC_SOCKET_URL=http://10.0.0.15:3011
+      - INTERNAL_SOCKET_URL=http://stream-socket:3001
+      - REDIS_URL=redis://redis:6379
+    restart: unless-stopped
+    mem_limit: 1536m
     healthcheck:
       test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-    deploy:
-      resources:
-        limits:
-          memory: 1024M
+    networks:
+      - stream-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   streamer:
-    image: stream-fighter-streamer:latest
     build:
       context: ./streamer
       dockerfile: Dockerfile
+    image: stream-fighter-streamer:latest
     env_file:
       - .env
+    environment:
+      - TARGET_URL=http://stream-screen:3010
+      - RTMP_URL=rtmp://restreamer:1935/live
     depends_on:
       stream-screen:
         condition: service_healthy
       restreamer:
-        condition: service_started
-    environment:
-      - TARGET_URL=http://stream-screen:3000
+        condition: service_healthy
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1024M
+    mem_limit: 1024m
+    networks:
+      - stream-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   stream-manager:
     build:
@@ -49,21 +72,41 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - RTMP_URL=rtmp://restreamer:1935/live
-      - NETWORK_NAME=stream-fighter_default
+      - NETWORK_NAME=stream-net
     restart: unless-stopped
+    mem_limit: 512m
+    networks:
+      - stream-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   restreamer:
     image: datarhei/restreamer:latest
+    environment:
+      - CORE_RTMP_ENABLE=true
+      - CORE_RTMP_APP=/live
     ports:
       - "8181:8080"
       - "1935:1935"
     volumes:
       - restreamer-data:/core/data
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+    mem_limit: 512m
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "http://localhost:8080" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - stream-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   stream-socket:
     build:
@@ -71,16 +114,41 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3011:3001"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
     restart: unless-stopped
+    mem_limit: 256m
     healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/socket.io/?EIO=4&transport=polling" ]
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 256M
+    networks:
+      - stream-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    networks:
+      - stream-net
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   restreamer-data:
+
+
+networks:
+  stream-net:
+    driver: bridge

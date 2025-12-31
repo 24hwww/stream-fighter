@@ -1,0 +1,39 @@
+FROM node:20-bookworm
+
+# Install runtime dependencies for Canvas and FFmpeg
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    pulseaudio \
+    pavucontrol \
+    procps \
+    curl \
+    build-essential \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Enable hot reload for Next.js in Docker
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV WATCHPACK_POLLING true
+
+COPY package*.json ./
+RUN npm install --legacy-peer-deps
+
+COPY . .
+RUN npx prisma generate
+
+COPY start.sh ./
+RUN chmod +x start.sh
+
+EXPOSE 3000
+ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
+
+# Use a modified start script or just dev command
+# We still need start.sh to init PulseAudio
+CMD ["bash", "./start.sh"]

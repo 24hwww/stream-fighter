@@ -1,0 +1,113 @@
+version: "3.9"
+
+# Configuración optimizada para Coolify
+# Este archivo está diseñado para ser usado en Coolify
+# Asegúrate de configurar todas las variables de entorno en el panel de Coolify
+
+services:
+  stream-screen:
+    build:
+      context: ./stream-screen
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    restart: unless-stopped
+    mem_limit: 2048m
+    shm_size: '512mb'
+    privileged: true  # Necesario para Xvfb y PulseAudio
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s  # Dar más tiempo para que Next.js inicie
+    networks:
+      - stream-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      restreamer:
+        condition: service_healthy
+
+  stream-socket:
+    build:
+      context: ./stream-socket
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    mem_limit: 256m
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - stream-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  stream-manager:
+    build:
+      context: ./stream-manager
+      dockerfile: Dockerfile
+    ports:
+      - "3020:3020"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - RTMP_URL=${RTMP_URL:-rtmp://restreamer:1935/live}
+      - NETWORK_NAME=${NETWORK_NAME:-stream-net}
+      - SCREEN_API_URL=${SCREEN_API_URL:-http://stream-screen:3000/api/stream}
+    restart: unless-stopped
+    mem_limit: 512m
+    networks:
+      - stream-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      stream-screen:
+        condition: service_healthy
+
+  restreamer:
+    image: datarhei/restreamer:2.6.1
+    ports:
+      - "8181:8181"  # Web UI
+      - "1935:1935"  # RTMP
+    volumes:
+      - restreamer-data:/core/data
+    restart: unless-stopped
+    mem_limit: 512m
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8181" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - stream-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  restreamer-data:
+    driver: local
+
+networks:
+  stream-net:
+    driver: bridge
+

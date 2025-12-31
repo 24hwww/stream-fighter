@@ -1,22 +1,26 @@
 FROM node:20-bookworm-slim AS base
 
 # Install runtime dependencies
+# Canvas dependencies: cairo, pango, libjpeg, giflib, librsvg
 RUN apt-get update && apt-get install -y \
-    chromium \
     ffmpeg \
-    xvfb \
     pulseaudio \
     pavucontrol \
-    x11-utils \
     procps \
     curl \
+    build-essential \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -52,4 +56,4 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-CMD ["./start.sh"]
+CMD ["bash", "./start.sh"]

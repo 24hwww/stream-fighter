@@ -1,13 +1,27 @@
 import prisma from "@/lib/prisma";
 import { generateNewPoll } from "@/lib/ai";
-import { io } from "socket.io-client";
+import { createSocketClient } from "@/lib/socketClient";
+import redis from "@/lib/redis";
 
 // Backend-to-Backend socket connection for event propagation
-const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://socket:3001");
+const socket = createSocketClient();
+
+const POLL_CACHE_KEY = "current_poll_full";
 
 export class PollService {
     static async getCurrentPoll() {
-        return await prisma.poll.findFirst({
+        try {
+            // 1. Try to get from Redis
+            const cached = await redis.get(POLL_CACHE_KEY);
+            if (cached) {
+                return JSON.parse(cached);
+            }
+        } catch (e) {
+            console.error("[PollService] Redis read error:", e);
+        }
+
+        // 2. Fallback to DB
+        const poll = await prisma.poll.findFirst({
             where: { active: true },
             include: {
                 optionA: { include: { _count: { select: { votes: true } } } },
@@ -16,6 +30,13 @@ export class PollService {
             },
             orderBy: { createdAt: 'desc' }
         });
+
+        // 3. Cache it (expire in 5 mins)
+        if (poll) {
+            await redis.set(POLL_CACHE_KEY, JSON.stringify(poll), "EX", 300);
+        }
+
+        return poll;
     }
 
     static async rotatePoll(categoryName = "General") {
@@ -36,7 +57,7 @@ export class PollService {
                 create: { name: categoryName }
             });
 
-            // 4. Create new poll with the options and dynamic images
+            // 4. Create new poll
             const newPoll = await prisma.poll.create({
                 data: {
                     category: { connect: { id: category.id } },
@@ -61,13 +82,16 @@ export class PollService {
                 }
             });
 
-            // Notify all clients via socket
+            // 5. Update Redis cache immediately
+            await redis.set(POLL_CACHE_KEY, JSON.stringify(newPoll), "EX", 305);
+
+            // Notify via socket
             socket.emit("poll-update", newPoll);
 
             return newPoll;
         } catch (error) {
             console.error("Poll rotation failed:", error);
-            throw error; // Let the API handler manage the fallback
+            throw error;
         }
     }
 
@@ -84,12 +108,22 @@ export class PollService {
     }
 
     static async registerVote(pollId, optionId) {
+        // En un sistema de alto tráfico, podríamos registrar esto solo en Redis 
+        // e ir sincronizando a Postgres por lotes. 
+        // Por ahora, lo hacemos en DB y actualizamos el cache de Redis.
+
         const vote = await prisma.vote.create({
             data: { pollId, optionId }
         });
 
-        // Notify socket server of new vote
+        // Actualizar el cache de Redis (opcionalmente podríamos invalidarlo o actualizarlo)
+        // Invalidar es más seguro: el siguiente que pida el poll forzará lectura fresca de DB con contadores actualizados.
+        await redis.del(POLL_CACHE_KEY);
+
+        // Notify socket server
         socket.emit("vote", { pollId, optionId });
+
+        console.log(`[PollService] Vote registered: pollId=${pollId}, optionId=${optionId}`);
 
         return vote;
     }

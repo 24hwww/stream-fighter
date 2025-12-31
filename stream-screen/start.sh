@@ -15,5 +15,15 @@ pactl load-module module-null-sink sink_name=vss sink_properties=device.descript
 pactl set-default-sink vss
 
 # Run Next.js server
-echo "Starting Next.js server..."
-node server.js
+if [ "$NODE_ENV" = "development" ]; then
+    echo "Starting Next.js in DEVELOPMENT mode (Hot Reload enabled)..."
+    npm run dev
+else
+    if [ -f "server.js" ]; then
+        echo "Starting Next.js in PRODUCTION mode..."
+        node server.js
+    else
+        echo "server.js not found, falling back to npm run dev..."
+        npm run dev
+    fi
+fi

@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-01-01T15:46:38.892Z",
+  "atlases": [
+    {
+      "character": "archer",
+      "atlasImage": "archer_atlas.png",
+      "atlasJson": "archer_atlas.json",
+      "spriteCount": 3,
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "character": "barbarian",
+      "atlasImage": "barbarian_atlas.png",
+      "atlasJson": "barbarian_atlas.json",
+      "spriteCount": 3,
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "character": "guard",
+      "atlasImage": "guard_atlas.png",
+      "atlasJson": "guard_atlas.json",
+      "spriteCount": 3,
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "character": "lion_knight",
+      "atlasImage": "lion_knight_atlas.png",
+      "atlasJson": "lion_knight_atlas.json",
+      "spriteCount": 3,
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "character": "mage",
+      "atlasImage": "mage_atlas.png",
+      "atlasJson": "mage_atlas.json",
+      "spriteCount": 3,
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "character": "merc",
+      "atlasImage": "merc_atlas.png",
+      "atlasJson": "merc_atlas.json",
+      "spriteCount": 3,
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "character": "ninja",
+      "atlasImage": "ninja_atlas.png",
+      "atlasJson": "ninja_atlas.json",
+      "spriteCount": 3,
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "character": "teal",
+      "atlasImage": "teal_atlas.png",
+      "atlasJson": "teal_atlas.json",
+      "spriteCount": 3,
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      }
+    }
+  ],
+  "usage": {
+    "phaser": {
+      "example": "this.load.atlas('ninja', '/atlases/ninja_atlas.png', '/atlases/ninja_atlas.json');"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "character": "LION_KNIGHT",
+  "size": 64,
+  "frames": {
+    "IDLE": [
+      {
+        "file": "lion_knight_idle_0.png",
+        "index": 0,
+        "size": 64
+      },
+      {
+        "file": "lion_knight_idle_1.png",
+        "index": 1,
+        "size": 64
+      }
+    ],
+    "PUNCH": [
+      {
+        "file": "lion_knight_punch_0.png",
+        "index": 0,
+        "size": 64
+      }
+    ]
+  },
+  "palette": {
+    "armor_blue": "#42529E",
+    "armor_gold": "#D8983A",
+    "plume_red": "#9A2A2A",
+    "skin_pale": "#F2B897",
+    "steel_silver": "#B8B0AB",
+    "beard_brown": "#5A3A22"
+  }
+}

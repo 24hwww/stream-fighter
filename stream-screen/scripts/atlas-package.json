@@ -1,0 +1,12 @@
+{
+    "name": "spritesheet-generator",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "generate-atlas": "node generateAtlas.js"
+    },
+    "dependencies": {
+        "@napi-rs/canvas": "^0.1.60",
+        "sharp": "^0.34.5"
+    }
+}

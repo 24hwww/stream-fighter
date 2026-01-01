@@ -1,0 +1,33 @@
+{
+  "character": "ARCHER",
+  "size": 64,
+  "frames": {
+    "IDLE": [
+      {
+        "file": "archer_idle_0.png",
+        "index": 0,
+        "size": 64
+      },
+      {
+        "file": "archer_idle_1.png",
+        "index": 1,
+        "size": 64
+      }
+    ],
+    "PUNCH": [
+      {
+        "file": "archer_punch_0.png",
+        "index": 0,
+        "size": 64
+      }
+    ]
+  },
+  "palette": {
+    "leather_green": "#4A6A3A",
+    "leather_dark": "#2A4A1A",
+    "skin_fair": "#E8C8A8",
+    "hair_blonde": "#D8B870",
+    "bow_wood": "#8A6A4A",
+    "string_white": "#D0D0D0"
+  }
+}

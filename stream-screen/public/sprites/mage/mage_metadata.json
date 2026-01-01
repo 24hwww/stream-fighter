@@ -1,0 +1,33 @@
+{
+  "character": "MAGE",
+  "size": 64,
+  "frames": {
+    "IDLE": [
+      {
+        "file": "mage_idle_0.png",
+        "index": 0,
+        "size": 64
+      },
+      {
+        "file": "mage_idle_1.png",
+        "index": 1,
+        "size": 64
+      }
+    ],
+    "PUNCH": [
+      {
+        "file": "mage_punch_0.png",
+        "index": 0,
+        "size": 64
+      }
+    ]
+  },
+  "palette": {
+    "robe_purple": "#6A3D9A",
+    "robe_dark": "#4A2A6A",
+    "orb_cyan": "#3AAAC2",
+    "orb_bright": "#5ADDFF",
+    "skin_pale": "#E8D4C8",
+    "beard_white": "#D0D0D8"
+  }
+}

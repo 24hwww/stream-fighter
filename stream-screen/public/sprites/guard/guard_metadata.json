@@ -1,0 +1,33 @@
+{
+  "character": "GUARD",
+  "size": 64,
+  "frames": {
+    "IDLE": [
+      {
+        "file": "guard_idle_0.png",
+        "index": 0,
+        "size": 64
+      },
+      {
+        "file": "guard_idle_1.png",
+        "index": 1,
+        "size": 64
+      }
+    ],
+    "PUNCH": [
+      {
+        "file": "guard_punch_0.png",
+        "index": 0,
+        "size": 64
+      }
+    ]
+  },
+  "palette": {
+    "plate_base": "#42529E",
+    "plate_dark": "#2A3670",
+    "scarf_base": "#9A2A2A",
+    "scarf_dark": "#6B1A1A",
+    "hair_base": "#5A5A6D",
+    "skin_base": "#F2B897"
+  }
+}

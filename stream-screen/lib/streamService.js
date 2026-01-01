@@ -22,7 +22,7 @@ class StreamService {
 
         // Usar Canvas renderer si está disponible (más eficiente)
         const useCanvas = process.env.USE_CANVAS_RENDERER !== 'false';
-        
+
         if (useCanvas) {
             try {
                 console.log(`[StreamService] Using Canvas renderer for ${streamKey}`);
@@ -79,20 +79,25 @@ class StreamService {
             console.log(`[StreamService] Waiting for page to load: ${targetUrl}`);
             await new Promise(resolve => setTimeout(resolve, 12000));
 
-            // 3. Start FFmpeg
+            // 3. Start FFmpeg (optimizado para baja latencia)
             console.log(`[StreamService] Launching FFmpeg to ${rtmpUrl}`);
             const ffmpegArgs = [
+                // Input de video (X11 grab)
                 '-f', 'x11grab', '-draw_mouse', '0', '-r', '30', '-s', '1280x720',
                 '-probesize', '10M', '-analyzeduration', '10M',
                 '-i', display,
+                // Input de audio (PulseAudio)
                 '-f', 'pulse', '-i', `${sinkName}.monitor`,
-                '-c:a', 'aac', '-ab', '128k', '-ar', '44100',
-
-                '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
-                '-b:v', '2048k', '-minrate', '2048k', '-maxrate', '2048k', '-bufsize', '2048k',
+                // Codificación de audio
+                '-c:a', 'aac', '-ab', '128k', '-ar', '44100', '-ac', '2',
+                // Codificación de video (optimizada para baja latencia)
+                '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency',
+                '-threads', '2',
+                '-b:v', '2048k', '-minrate', '2048k', '-maxrate', '2048k', '-bufsize', '1024k',
                 '-nal-hrd', 'cbr',
                 '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '3.1',
-                '-g', '60',
+                '-g', '60', '-sc_threshold', '0',
+                // Output RTMP
                 '-f', 'flv', '-flvflags', 'no_duration_filesize',
                 '-map', '0:v:0', '-map', '1:a:0',
                 rtmpUrl
@@ -125,17 +130,28 @@ class StreamService {
         }
     }
 
-    stopStream(streamKey) {
+    async stopStream(streamKey) {
         const stream = this.activeStreams.get(streamKey);
+
+        // Check if it's a canvas stream first
+        const { canvasStreamService } = await import('./canvasStreamService.js');
+        const isCanvasStream = canvasStreamService.activeStreams.has(streamKey);
+
+        if (isCanvasStream) {
+            await canvasStreamService.stopStream(streamKey);
+        }
+
         if (stream) {
             console.log(`[StreamService] Stopping stream: ${streamKey}`);
-            try { stream.ffmpeg.kill('SIGTERM'); } catch (e) { }
-            try { stream.chrome.kill('SIGTERM'); } catch (e) { }
-            try { stream.xvfb.kill('SIGTERM'); } catch (e) { }
+            try { if (stream.ffmpeg) stream.ffmpeg.kill('SIGTERM'); } catch (e) { }
+            try { if (stream.chrome) stream.chrome.kill('SIGTERM'); } catch (e) { }
+            try { if (stream.xvfb) stream.xvfb.kill('SIGTERM'); } catch (e) { }
+
             this.activeStreams.delete(streamKey);
             return true;
         }
-        return false;
+
+        return isCanvasStream;
     }
 
     listStreams() {

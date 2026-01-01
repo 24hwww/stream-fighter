@@ -44,3 +44,8 @@ streamer/melody.wav
 
 # GitHub Actions Runner
 actions-runner/
+
+# Backups (optimización arquitectónica)
+*.BACKUP_*/
+streamer.BACKUP_*/
+stream-manager.BACKUP_*/

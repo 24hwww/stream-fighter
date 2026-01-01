@@ -1,0 +1,31 @@
+{
+  "character": "TEAL",
+  "size": 64,
+  "frames": {
+    "IDLE": [
+      {
+        "file": "teal_idle_0.png",
+        "index": 0,
+        "size": 64
+      },
+      {
+        "file": "teal_idle_1.png",
+        "index": 1,
+        "size": 64
+      }
+    ],
+    "PUNCH": [
+      {
+        "file": "teal_punch_0.png",
+        "index": 0,
+        "size": 64
+      }
+    ]
+  },
+  "palette": {
+    "hair_base": "#3AA296",
+    "hair_dark": "#22746B",
+    "dress_base": "#D9543A",
+    "skin_base": "#F2B897"
+  }
+}

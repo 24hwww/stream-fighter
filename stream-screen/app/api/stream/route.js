@@ -32,7 +32,7 @@ export async function DELETE(request) {
             return NextResponse.json({ error: 'Missing streamKey parameter' }, { status: 400 });
         }
 
-        const stopped = streamService.stopStream(streamKey);
+        const stopped = await streamService.stopStream(streamKey);
         return NextResponse.json({ stopped, streamKey });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,0 +1,33 @@
+{
+  "character": "NINJA",
+  "size": 64,
+  "frames": {
+    "IDLE": [
+      {
+        "file": "ninja_idle_0.png",
+        "index": 0,
+        "size": 64
+      },
+      {
+        "file": "ninja_idle_1.png",
+        "index": 1,
+        "size": 64
+      }
+    ],
+    "PUNCH": [
+      {
+        "file": "ninja_punch_0.png",
+        "index": 0,
+        "size": 64
+      }
+    ]
+  },
+  "palette": {
+    "cloth_dark": "#2A2A3D",
+    "cloth_mid": "#3D3D52",
+    "mask_red": "#8A2A2A",
+    "skin_tan": "#D4A574",
+    "blade_steel": "#C0C0D0",
+    "blade_dark": "#707080"
+  }
+}

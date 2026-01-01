@@ -1,0 +1,35 @@
+{
+  "character": "MERC",
+  "size": 64,
+  "frames": {
+    "IDLE": [
+      {
+        "file": "merc_idle_0.png",
+        "index": 0,
+        "size": 64
+      },
+      {
+        "file": "merc_idle_1.png",
+        "index": 1,
+        "size": 64
+      }
+    ],
+    "PUNCH": [
+      {
+        "file": "merc_punch_0.png",
+        "index": 0,
+        "size": 64
+      }
+    ]
+  },
+  "palette": {
+    "skin_base": "#C27E6A",
+    "skin_dark": "#8B5441",
+    "jacket_base": "#5A854C",
+    "jacket_dark": "#3A552F",
+    "beanie_base": "#525266",
+    "beanie_dark": "#353545",
+    "gun_base": "#4A4A58",
+    "gun_mid": "#B8B0AB"
+  }
+}

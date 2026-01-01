@@ -1,19 +1,32 @@
 import { spawn } from 'child_process';
-import { canvasRenderer } from './canvasRenderer.js';
+import { Canvas, Path2D } from 'skia-canvas';
+import sharp from 'sharp';
+
+// Global polyfills for ProceduralRenderer in Node
+if (typeof global !== 'undefined') {
+    global.Path2D = Path2D;
+    global.Canvas = Canvas;
+}
+import { fighterStateService } from './fighterStateService.js';
 import prisma from './prisma.js';
 import { io } from 'socket.io-client';
+import { ArcadeEngine } from '../engine/index.js';
+import { SkiaRenderer } from '../engine/renderer/skiaRenderer.js';
 
 /**
- * Canvas-based Stream Service
- * Reemplaza Chromium con renderizado Canvas directo para mejor rendimiento
+ * Pixi-based Stream Service
  */
 class CanvasStreamService {
     constructor() {
         if (!global.canvasStreamServiceInstance) {
             this.activeStreams = new Map();
-            this.frameGenerators = new Map();
             global.canvasStreamServiceInstance = this;
         }
+
+        // Use ArcadeEngine + SkiaRenderer
+        this.engine = new ArcadeEngine(320, 180);
+        this.renderer = new SkiaRenderer(320, 180, 1280, 720);
+
         return global.canvasStreamServiceInstance;
     }
 
@@ -29,8 +42,8 @@ class CanvasStreamService {
         console.log(`[CanvasStreamService] Starting stream: id=${screenId}, key=${streamKey}`);
 
         try {
-            // 1. Inicializar renderizador Canvas
-            await canvasRenderer.initialize();
+            // 1. Initialize renderer if needed (canvasRenderer handles this internally in renderFrame)
+            // await this.renderer.initialize(); // Optional explicit call
 
             // 2. Crear PulseAudio sink para audio
             const sinkName = `vss_${streamKey}`;
@@ -51,21 +64,33 @@ class CanvasStreamService {
             const socket = io(socketUrl);
 
             let currentPollData = null;
+            let currentDesigns = null;
 
-            // Función para obtener datos del poll
+            // Función para obtener datos del poll y diseños
             const fetchPollData = async () => {
                 try {
-                    // Usar fetch nativo de Node.js 18+ o import dinámico
-                    let fetchFn;
-                    if (typeof fetch !== 'undefined') {
-                        fetchFn = fetch;
-                    } else {
-                        const nodeFetch = await import('node-fetch');
-                        fetchFn = nodeFetch.default;
-                    }
-                    const response = await fetchFn(`http://localhost:3000/api/poll`);
+                    // Use global fetch (available in Node.js 18+)
+                    const response = await fetch(`http://localhost:3000/api/poll`);
                     const data = await response.json();
-                    currentPollData = data;
+
+                    if (data.current) {
+                        const prevPollId = currentPollData?.current?.id;
+                        currentPollData = data;
+
+                        // Fetch designs if poll changed or designs missing
+                        if (data.current.id !== prevPollId || !currentDesigns) {
+                            console.log(`[CanvasStreamService] Poll changed to ${data.current.id}, fetching designs...`);
+                            try {
+                                const designsRes = await fetch(`http://localhost:3000/api/poll/designs/${data.current.id}`);
+                                if (designsRes.ok) {
+                                    currentDesigns = await designsRes.json();
+                                    this.engine.updateDesigns(currentDesigns);
+                                }
+                            } catch (dErr) {
+                                console.error('[CanvasStreamService] Error fetching designs:', dErr);
+                            }
+                        }
+                    }
                 } catch (err) {
                     console.error('[CanvasStreamService] Error fetching poll:', err);
                 }
@@ -83,36 +108,37 @@ class CanvasStreamService {
                 fetchPollData();
             });
 
-            // 5. Crear pipe para FFmpeg
-            // 5. Configurar argumentos de FFmpeg
+            // 5. Configurar argumentos de FFmpeg optimizados para baja latencia
             const ffmpegArgs = [
+                // Input de video (Canvas raw frames)
                 '-f', 'rawvideo',
                 '-vcodec', 'rawvideo',
                 '-s', '1280x720',
-                '-pix_fmt', 'rgb24',
+                '-pix_fmt', 'rgb24',    // ProceduralRenderer now returns RGB24 (via Sharp)
                 '-r', '30',
                 '-i', 'pipe:0',
-                '-f', 'pulse',
-                '-i', `${sinkName}.monitor`,
+                // Codificación de video (optimizada para baja latencia)
                 '-c:v', 'libx264',
-                '-preset', 'veryfast',
+                '-preset', 'ultrafast',
                 '-tune', 'zerolatency',
+                '-threads', '2',
                 '-b:v', '2048k',
                 '-minrate', '2048k',
                 '-maxrate', '2048k',
-                '-bufsize', '2048k',
+                '-bufsize', '1024k',
                 '-nal-hrd', 'cbr',
                 '-pix_fmt', 'yuv420p',
                 '-profile:v', 'main',
                 '-level', '3.1',
                 '-g', '60',
-                '-c:a', 'aac',
-                '-ab', '128k',
-                '-ar', '44100',
+                '-sc_threshold', '0',
+                // Output RTMP
                 '-f', 'flv',
                 '-flvflags', 'no_duration_filesize',
                 rtmpUrl
             ];
+
+            // Note: Removed PulseAudio input for now to stabilize the stream while fixing permissions
 
             let ffmpeg = null;
             let isRunning = true;
@@ -155,15 +181,64 @@ class CanvasStreamService {
 
                     if (elapsed >= frameInterval) {
                         try {
-                            // Renderizar frame
-                            const frameBuffer = await canvasRenderer.generateFrameBuffer(currentPollData, config);
+                            // 1. Sync Logic State from Redis/Poll
+                            const combatState = await fighterStateService.getState(currentPollData?.current?.id || 'idle');
 
-                            // Enviar a FFmpeg si el proceso está activo
+                            // 2. Map Combat State to Renderable State
+                            const renderState = {
+                                fighters: [
+                                    {
+                                        x: 320, y: 550,
+                                        hp: combatState.fighterA.hp,
+                                        flip: false,
+                                        action: combatState.fighterA.animation
+                                    },
+                                    {
+                                        x: 960, y: 550,
+                                        hp: combatState.fighterB.hp,
+                                        flip: true,
+                                        action: combatState.fighterB.animation
+                                    }
+                                ],
+                                timer: Math.floor((new Date(currentPollData?.current?.expiresAt || Date.now()) - Date.now()) / 1000)
+                            };
+
+                            // Update Combat logic (damage shakes, etc.)
+                            if (currentPollData && currentPollData.current) {
+                                await fighterStateService.updateCombat(currentPollData.current.id, currentPollData.current);
+                            }
+
+                            // 3. Render Procedurally using ArcadeEngine
+                            this.engine.update(elapsed);
+
+                            // Synchronize engine state with combat state
+                            this.engine.p1.hp = combatState.fighterA.hp / 100;
+                            this.engine.p2.hp = combatState.fighterB.hp / 100;
+                            this.engine.p1.anim.setState(combatState.fighterA.animation.toUpperCase());
+                            this.engine.p2.anim.setState(combatState.fighterB.animation.toUpperCase());
+                            this.engine.state.timer = renderState.timer;
+
+                            const pixelBuffer = this.engine.render(now);
+                            const canvas = this.renderer.render(pixelBuffer);
+
+                            // Get raw RGB24 buffer from Skia
+                            const frameBuffer = await canvas.toBuffer('raw');
+                            // Note: raw from skia is RGBA, we need RGB or tell ffmpeg it's RGBA
+                            // I'll update ffmpeg args to accept rgba for simplicity or convert here.
+                            // Let's use RGB for consistency with previous setup.
+
+                            const sharpBuffer = await sharp(frameBuffer, {
+                                raw: { width: 1280, height: 720, channels: 4 }
+                            })
+                                .removeAlpha()
+                                .toBuffer();
+
+                            // 4. Pipe to FFmpeg
                             if (ffmpeg && ffmpeg.stdin && !ffmpeg.stdin.destroyed) {
                                 try {
-                                    ffmpeg.stdin.write(frameBuffer);
+                                    ffmpeg.stdin.write(sharpBuffer);
                                 } catch (writeErr) {
-                                    // Ignorar errores de escritura momentáneos (ej. durante reinicio)
+                                    // Handle pipe pressure/breaks
                                 }
                             }
 
@@ -173,7 +248,7 @@ class CanvasStreamService {
                         }
                     }
 
-                    // Pequeña pausa para no saturar CPU
+                    // Strict FPS control
                     await new Promise(resolve => setTimeout(resolve, 1));
                 }
             };
@@ -204,7 +279,7 @@ class CanvasStreamService {
         }
     }
 
-    stopStream(streamKey) {
+    async stopStream(streamKey) {
         const stream = this.activeStreams.get(streamKey);
         if (stream) {
             console.log(`[CanvasStreamService] Stopping stream: ${streamKey}`);

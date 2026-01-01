@@ -104,3 +104,6 @@ Si ves `localhost:3001`, el código compilado todavía tiene la URL antigua y ne
 - ⚠️ Necesita reconstruir la imagen para aplicar cambios
 - ⚠️ Build actualmente fallando (posible problema con dependencias)
 
+
+
+

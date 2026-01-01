@@ -39,7 +39,20 @@ export default function MobileVoting() {
         // Listen for vote updates (to show real-time progress)
         socket.on("vote-update", (data) => {
             console.log("Vote update received:", data);
-            fetchPoll(false); // SILENT update (no full-screen spinner)
+
+            // Sincronización instantánea si la data es completa
+            if (data.optionA_votes !== undefined && data.pollId) {
+                setPoll(prev => {
+                    if (!prev || prev.id !== data.pollId) return prev;
+                    return {
+                        ...prev,
+                        optionA: { ...prev.optionA, _count: { ...prev.current?.optionA?._count || prev.optionA._count, votes: data.optionA_votes } },
+                        optionB: { ...prev.optionB, _count: { ...prev.current?.optionB?._count || prev.optionB._count, votes: data.optionB_votes } }
+                    };
+                });
+            } else {
+                fetchPoll(false); // Fallback silencioso
+            }
         });
 
         return () => {

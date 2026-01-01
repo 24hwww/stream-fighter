@@ -177,3 +177,6 @@ NEXT_PUBLIC_SOCKET_URL=http://10.0.0.15:3011
 
 La sincronización debería funcionar correctamente ahora. Los votos y actualizaciones de polls se propagan a todos los clientes conectados.
 
+
+
+

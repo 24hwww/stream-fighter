@@ -212,3 +212,6 @@ Si encuentras problemas:
 3. Consulta `DEPLOYMENT.md` para más detalles
 4. Revisa la documentación de Coolify: https://coolify.io/docs
 
+
+
+

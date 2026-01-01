@@ -1,13 +1,14 @@
-#!/bin/bash
-# Cleanup Xvfb lock files
-rm -f /tmp/.X*-lock
-
-# Silence DBUS and Accessibility warnings
-export NO_AT_BRIDGE=1
-export DBUS_SESSION_BUS_ADDRESS=/dev/null
+# Cleanup PulseAudio and X11
+rm -rf /tmp/.X*-lock /tmp/pulse-* /root/.config/pulse /root/.pulse-cookie
+mkdir -p /tmp/pulse-socket
 
 # Initialize PulseAudio
-pulseaudio -D --exit-idle-time=-1 --system=false
+# Note: In Docker as root, --system is usually required, but it needs a pulse user.
+# Adding a fallback to just running it with --disallow-exit if system fails.
+if ! pulseaudio -D --system --disallow-exit --disallow-module-loading=0; then
+    echo "PulseAudio system mode failed, trying standard mode as root..."
+    pulseaudio -D --exit-idle-time=-1 --system=false --disallow-exit --disallow-module-loading=0
+fi
 sleep 2
 
 # Create the default virtual sink

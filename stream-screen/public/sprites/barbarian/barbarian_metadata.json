@@ -1,0 +1,33 @@
+{
+  "character": "BARBARIAN",
+  "size": 64,
+  "frames": {
+    "IDLE": [
+      {
+        "file": "barbarian_idle_0.png",
+        "index": 0,
+        "size": 64
+      },
+      {
+        "file": "barbarian_idle_1.png",
+        "index": 1,
+        "size": 64
+      }
+    ],
+    "PUNCH": [
+      {
+        "file": "barbarian_punch_0.png",
+        "index": 0,
+        "size": 64
+      }
+    ]
+  },
+  "palette": {
+    "skin_tan": "#C8956A",
+    "skin_dark": "#9A6A42",
+    "fur_brown": "#5A3A22",
+    "leather_dark": "#3A2A1A",
+    "axe_steel": "#A0A0B0",
+    "axe_wood": "#6A4A2A"
+  }
+}

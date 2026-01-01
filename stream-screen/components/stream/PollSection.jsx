@@ -33,7 +33,23 @@ export default function PollSection() {
 
         socket.on("vote-update", (data) => {
             console.log("Real-time vote received:", data);
-            fetchPoll(false); // Silent refresh to update vote counts
+
+            // Sincronización ultrarápida sin fetch
+            if (data.optionA_votes !== undefined && data.pollId) {
+                setPoll(prev => {
+                    if (!prev || !prev.current || prev.current.id !== data.pollId) return prev;
+                    return {
+                        ...prev,
+                        current: {
+                            ...prev.current,
+                            optionA: { ...prev.current.optionA, _count: { ...prev.current.optionA._count, votes: data.optionA_votes } },
+                            optionB: { ...prev.current.optionB, _count: { ...prev.current.optionB._count, votes: data.optionB_votes } }
+                        }
+                    };
+                });
+            } else {
+                fetchPoll(false); // Fallback
+            }
         });
 
         socket.on("poll-refresh", (data) => {

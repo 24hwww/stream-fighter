@@ -2,6 +2,10 @@ import prisma from "@/lib/prisma";
 import { generateNewPoll } from "@/lib/ai";
 import { createSocketClient } from "@/lib/socketClient";
 import redis from "@/lib/redis";
+import { fighterStateService } from "@/lib/fighterStateService";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger('PollService');
 
 // Backend-to-Backend socket connection for event propagation
 const socket = createSocketClient();
@@ -17,7 +21,7 @@ export class PollService {
                 return JSON.parse(cached);
             }
         } catch (e) {
-            console.error("[PollService] Redis read error:", e);
+            log.error('Redis read error:', e.message);
         }
 
         // 2. Fallback to DB
@@ -33,7 +37,11 @@ export class PollService {
 
         // 3. Cache it (expire in 5 mins)
         if (poll) {
-            await redis.set(POLL_CACHE_KEY, JSON.stringify(poll), "EX", 300);
+            try {
+                await redis.set(POLL_CACHE_KEY, JSON.stringify(poll), "EX", 300);
+            } catch (e) {
+                log.warn('Failed to cache poll:', e.message);
+            }
         }
 
         return poll;
@@ -47,7 +55,7 @@ export class PollService {
                 data: { active: false }
             });
 
-            // 2. Generate new options using AI
+            // 2. Generate new options using AI (Now includes full designs)
             const aiData = await generateNewPoll(categoryName);
 
             // 3. Find or create category
@@ -65,13 +73,13 @@ export class PollService {
                     optionA: {
                         create: {
                             name: aiData.optionA.name,
-                            image: aiData.optionA.image ? `https://loremflickr.com/800/800/${encodeURIComponent(aiData.optionA.image)}?lock=${Math.floor(Math.random() * 1000)}` : null
+                            image: null
                         }
                     },
                     optionB: {
                         create: {
                             name: aiData.optionB.name,
-                            image: aiData.optionB.image ? `https://loremflickr.com/800/800/${encodeURIComponent(aiData.optionB.image)}?lock=${Math.floor(Math.random() * 1000)}` : null
+                            image: null
                         }
                     }
                 },
@@ -82,7 +90,15 @@ export class PollService {
                 }
             });
 
-            // 5. Update Redis cache immediately
+            // 5. Store designs in Redis linked to poll ID
+            const designs = {
+                fighterA: aiData.optionA.design,
+                fighterB: aiData.optionB.design,
+                stage: aiData.stage
+            };
+            await redis.set(`designs_poll_${newPoll.id}`, JSON.stringify(designs), "EX", 1200); // 20 mins
+
+            // 6. Update Redis cache immediately
             await redis.set(POLL_CACHE_KEY, JSON.stringify(newPoll), "EX", 305);
 
             // Notify via socket
@@ -90,7 +106,7 @@ export class PollService {
 
             return newPoll;
         } catch (error) {
-            console.error("Poll rotation failed:", error);
+            log.error('Poll rotation failed:', error.message, error.stack);
             throw error;
         }
     }
@@ -108,22 +124,68 @@ export class PollService {
     }
 
     static async registerVote(pollId, optionId) {
-        // En un sistema de alto tráfico, podríamos registrar esto solo en Redis 
-        // e ir sincronizando a Postgres por lotes. 
-        // Por ahora, lo hacemos en DB y actualizamos el cache de Redis.
-
+        // 1. Registro asíncrono en DB (fuego y olvido para velocidad si queremos, pero lo mantenemos síncrono para integridad)
         const vote = await prisma.vote.create({
             data: { pollId, optionId }
         });
 
-        // Actualizar el cache de Redis (opcionalmente podríamos invalidarlo o actualizarlo)
-        // Invalidar es más seguro: el siguiente que pida el poll forzará lectura fresca de DB con contadores actualizados.
-        await redis.del(POLL_CACHE_KEY);
+        // 2. Actualización de CACHE INCREMENTAL (Crítico para Real-Time)
+        let pollData = null;
+        try {
+            const cached = await redis.get(POLL_CACHE_KEY);
+            if (cached) {
+                pollData = JSON.parse(cached);
+                // Si el pollId coincide, incrementamos en memoria
+                if (pollData.id === pollId) {
+                    if (pollData.optionA.id === optionId) {
+                        pollData.optionA._count.votes++;
+                    } else if (pollData.optionB.id === optionId) {
+                        pollData.optionB._count.votes++;
+                    }
+                    // Guardamos de nuevo el cache actualizado
+                    await redis.set(POLL_CACHE_KEY, JSON.stringify(pollData), "EX", 305);
+                } else {
+                    pollData = null; // Cache desincronizado
+                }
+            }
+        } catch (e) {
+            log.error('Incremental cache update failed:', e.message);
+        }
 
-        // Notify socket server
-        socket.emit("vote", { pollId, optionId });
+        // 3. Fallback a lectura completa si no había cache o falló
+        if (!pollData) {
+            pollData = await this.getCurrentPoll();
+        }
 
-        console.log(`[PollService] Vote registered: pollId=${pollId}, optionId=${optionId}`);
+        // 4. Actualizar estado de combate (HP, animaciones)
+        let combatState = null;
+        if (pollData) {
+            combatState = await fighterStateService.updateCombat(pollId, pollData);
+        }
+
+        // 5. Notificar al Socket Server con DATA COMPLETA (Votos + Estado de Combate)
+        // Esto permite sincronización instantánea sin fetch()
+        if (pollData && combatState) {
+            socket.emit("vote", {
+                pollId,
+                optionId,
+                optionA_votes: pollData.optionA._count.votes,
+                optionB_votes: pollData.optionB._count.votes,
+                combatState // Enviamos el estado fresco (HP, animaciones)
+            });
+        } else if (pollData) {
+            socket.emit("vote", {
+                pollId,
+                optionId,
+                optionA_votes: pollData.optionA._count.votes,
+                optionB_votes: pollData.optionB._count.votes
+            });
+        } else {
+            // Fallback total
+            socket.emit("vote", { pollId, optionId });
+        }
+
+        log.debug(`Vote registered (Real-Time): pollId=${pollId}, optionId=${optionId}`);
 
         return vote;
     }

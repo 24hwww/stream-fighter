@@ -12,6 +12,7 @@ services:
       - INTERNAL_SOCKET_URL=http://stream-socket:3001
       - REDIS_URL=redis://redis:6379
       - RTMP_URL=${RTMP_URL:-rtmp://restreamer:1935/live}
+      - USE_CANVAS_RENDERER=true
     env_file:
       - .env
     restart: unless-stopped
@@ -27,6 +28,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     depends_on:
       redis:
         condition: service_healthy
@@ -53,11 +55,20 @@ services:
         condition: service_healthy
     restart: unless-stopped
     mem_limit: 256m
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     networks:
       - stream-net
 
   restreamer:
     image: datarhei/restreamer:latest
+    environment:
+      - CORE_RTMP_ENABLE=true
+      - CORE_RTMP_APP=/live
     ports:
       - "8181:8181"
       - "1935:1935"
@@ -65,6 +76,12 @@ services:
       - restreamer-data:/core/data
     restart: unless-stopped
     mem_limit: 512m
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8080" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - stream-net
 
@@ -73,6 +90,11 @@ services:
     restart: unless-stopped
     mem_limit: 128m
     command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
     networks:
       - stream-net
 

@@ -33,19 +33,10 @@ const nextConfig = {
       };
     }
 
-    // Optimización para producción
-    if (!dev) {
+    // Optimización para producción: Next.js ya maneja esto por defecto.
+    // Solo añadimos optimizaciones específicas si son necesarias y compatibles con ESM.
+    if (!dev && isServer) {
       config.optimization.minimize = true;
-      config.optimization.minimizer = [
-        new (require('terser-webpack-plugin'))({
-          terserOptions: {
-            compress: {
-              drop_console: true,
-              drop_debugger: true,
-            },
-          },
-        }),
-      ];
     }
 
     return config;

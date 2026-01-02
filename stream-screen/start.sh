@@ -21,13 +21,25 @@ pactl set-default-sink vss
 # Run Next.js server
 if [ "$NODE_ENV" = "development" ]; then
     echo "Starting Next.js in DEVELOPMENT mode (Hot Reload enabled)..."
+    # Ensure dependencies are installed if mounted without them
+    if [ ! -d "node_modules" ]; then
+        npm install --legacy-peer-deps
+    fi
+    npx prisma generate
     npm run dev
 else
+    echo "Starting Next.js in PRODUCTION mode..."
+    # Next.js standalone output puts server.js in the root of the standalone folder
     if [ -f "server.js" ]; then
-        echo "Starting Next.js in PRODUCTION mode..."
         node server.js
     else
-        echo "server.js not found, falling back to npm run dev..."
-        npm run dev
+        echo "server.js not found, checking .next/standalone..."
+        if [ -f ".next/standalone/server.js" ]; then
+            cd .next/standalone
+            node server.js
+        else
+            echo "Error: Could not find server.js. Falling back to npm run start (might fail if devDeps missing)."
+            npm run start
+        fi
     fi
 fi

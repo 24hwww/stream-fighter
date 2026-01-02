@@ -3,13 +3,19 @@ const http = require("http");
 const Redis = require("ioredis");
 const { createAdapter } = require("@socket.io/redis-adapter");
 
-const httpServer = http.createServer();
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
 const SCREEN_API_URL = process.env.INTERNAL_SCREEN_URL || "http://stream-screen:3000";
 
 const pubClient = new Redis(REDIS_URL);
 const subClient = pubClient.duplicate();
 const redis = pubClient.duplicate();
+
+const httpServer = http.createServer((req, res) => {
+    if (req.url === "/health") {
+        res.writeHead(200);
+        return res.end("OK");
+    }
+});
 
 const io = new Server(httpServer, {
     cors: { origin: "*", methods: ["GET", "POST"] },
@@ -29,13 +35,13 @@ async function tick() {
             if (pollData && pollData.current) {
                 pollId = pollData.current.id;
                 await redis.set("current_poll_id", pollId, "EX", 3600);
-                console.log(`[Engine] Found active poll via API: ${pollId}`);
+                console.log(\`[Engine] Found active poll via API: \${pollId}\`);
             } else {
                 return; // No active poll to tick
             }
         }
 
-        const stateKey = `fighter:${pollId}`;
+        const stateKey = \`fighter:\${pollId}\`;
         const rawState = await redis.get(stateKey);
         if (!rawState) return;
 
@@ -51,7 +57,7 @@ async function tick() {
             if (state.timer <= 0) {
                 state.combatOver = true;
                 state.winner = state.fighterA.hp > state.fighterB.hp ? 'A' : 'B';
-                console.log(`[Engine] Time Over! Winner: ${state.winner}`);
+                console.log(\`[Engine] Time Over! Winner: \${state.winner}\`);
             }
         }
 
@@ -73,13 +79,13 @@ async function tick() {
         if (!state.combatOver && (state.fighterA.hp <= 0 || state.fighterB.hp <= 0)) {
             state.combatOver = true;
             state.winner = state.fighterA.hp <= 0 ? 'B' : 'A';
-            console.log(`[Engine] KO Detected! Winner: ${state.winner}`);
+            console.log(\`[Engine] KO Detected! Winner: \${state.winner}\`);
         }
 
         // --- AUTOMATIC ROTATION TRIGGER ---
         if (state.combatOver && !rotationLock) {
             rotationLock = true;
-            console.log(`[Engine] Match ended. Triggering rotation in 8s...`);
+            console.log(\`[Engine] Match ended. Triggering rotation in 8s...\`);
             setTimeout(() => {
                 triggerRotation();
             }, 8000);
@@ -110,10 +116,10 @@ function triggerRotation() {
     const req = http.request(url, options, (res) => {
         let body = '';
         res.on('data', (d) => body += d);
-        res.on('end', () => console.log(`[Engine] Rotation API Response: ${body}`));
+        res.on('end', () => console.log(\`[Engine] Rotation API Response: \${body}\`));
     });
 
-    req.on('error', (e) => console.error(`[Engine] Rotation API Error: ${e.message}`));
+    req.on('error', (e) => console.error(\`[Engine] Rotation API Error: \${e.message}\`));
     req.end();
 }
 
@@ -151,13 +157,5 @@ io.on("connection", async (socket) => {
     socket.on("disconnect", () => console.log("Remote Node disconnected"));
 });
 
-httpServer.on("request", (req, res) => {
-    if (req.url === "/health") {
-        res.writeHead(200); res.end("OK");
-    } else {
-        res.writeHead(404); res.end();
-    }
-});
-
-const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => console.log(`Gaming Engine Pulse active on port ${PORT}`));
+const PORT = 3001;
+httpServer.listen(PORT, () => console.log(\`Gaming Engine Pulse active on port \${PORT}\`));

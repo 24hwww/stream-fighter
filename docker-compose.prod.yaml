@@ -3,26 +3,20 @@ services:
     build:
       context: ./stream-screen
       dockerfile: Dockerfile
-      target: development # Use the development stage for hot-reload
+      # Defaults to the last stage (runner) which is optimized for production
     ports:
       - "3000:3000"
-    volumes:
-      - ./stream-screen:/app
-      - /app/node_modules
-      - /app/.next
     environment:
-      - NODE_ENV=development
-      - WATCHPACK_POLLING=true
-      - NEXT_PUBLIC_SOCKET_URL=http://localhost:3011
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL} # Should be set in .env or Coolify
       - INTERNAL_SOCKET_URL=http://stream-socket:3001
       - REDIS_URL=redis://redis:6379
-      - RTMP_URL=rtmp://restreamer:1935/live
-      - USE_CANVAS_RENDERER=true
+      - RTMP_URL=${RTMP_URL:-rtmp://restreamer:1935/live}
     env_file:
       - .env
     restart: unless-stopped
-    mem_limit: 1536m
-    cpus: 2
+    mem_limit: 2048m
+    shm_size: '512mb'
     privileged: true
     cap_add:
       - SYS_ADMIN
@@ -48,7 +42,7 @@ services:
       context: ./stream-socket
       dockerfile: Dockerfile
     ports:
-      - "3011:3001"
+      - "3001:3001"
     environment:
       - REDIS_URL=redis://redis:6379
       - INTERNAL_SCREEN_URL=http://stream-screen:3000
@@ -59,31 +53,18 @@ services:
         condition: service_healthy
     restart: unless-stopped
     mem_limit: 256m
-    healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     networks:
       - stream-net
 
   restreamer:
     image: datarhei/restreamer:latest
-    environment:
-      - CORE_RTMP_ENABLE=true
-      - CORE_RTMP_APP=/live
     ports:
-      - "8181:8181" # Web UI
-      - "1935:1935" # RTMP
+      - "8181:8181"
+      - "1935:1935"
     volumes:
       - restreamer-data:/core/data
     restart: unless-stopped
     mem_limit: 512m
-    healthcheck:
-      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8080" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
     networks:
       - stream-net
 
@@ -94,11 +75,6 @@ services:
     command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru
     networks:
       - stream-net
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 20s
-      timeout: 5s
-      retries: 5
 
 volumes:
   restreamer-data:

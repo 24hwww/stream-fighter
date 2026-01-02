@@ -65,7 +65,7 @@ export class PollService {
             const newPoll = await prisma.poll.create({
                 data: {
                     category: { connect: { id: category.id } },
-                    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+                    expiresAt: new Date(Date.now() + 3 * 60 * 1000), // 3-minute match timer
                     optionA: {
                         create: {
                             name: aiData.optionA.name,

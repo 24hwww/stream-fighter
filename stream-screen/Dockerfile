@@ -37,7 +37,7 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 # Disable Next.js telemetry
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 # Build application
 RUN npm run build
 
@@ -59,7 +59,7 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Copy standalone build from builder
 COPY --from=builder /app/public ./public
@@ -72,7 +72,7 @@ COPY --from=builder /app/start.sh ./start.sh
 RUN chmod +x start.sh
 
 EXPOSE 3000
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 CMD ["/bin/bash", "/app/start.sh"]

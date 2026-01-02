@@ -131,6 +131,20 @@ docker inspect <container-id> | grep -A 10 Health
 
 **Solución**: Ya está corregido en `docker-compose.prod.yaml`. Solo necesitas redesplegar.
 
+### Error: "Call retries were exceeded" durante npm run build
+
+**Causa**: Conflicto con la configuración de Turbopack en Next.js.
+
+**Solución**: Ya está corregido en el commit `73bd9e6f`. Los cambios incluyen:
+1. Eliminación de la configuración `turbo` de `next.config.mjs`
+2. Uso explícito de webpack en lugar de Turbopack
+3. Corrección del formato ENV en el Dockerfile
+
+Si aún ves este error:
+1. Asegúrate de que Coolify esté usando el commit más reciente
+2. Limpia la caché de build en Coolify (si está disponible)
+3. Verifica que todas las variables de entorno estén configuradas correctamente
+
 ---
 
 ## 📊 Verificación de Éxito

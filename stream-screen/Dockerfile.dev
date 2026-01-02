@@ -43,4 +43,5 @@ ENV HOSTNAME "0.0.0.0"
 
 # Use a modified start script or just dev command
 # We still need start.sh to init PulseAudio
-CMD ["bash", "./start.sh"]
+# Use absolute path for safety
+CMD ["/bin/bash", "/app/start.sh"]

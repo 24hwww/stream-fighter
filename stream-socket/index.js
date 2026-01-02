@@ -4,71 +4,160 @@ const Redis = require("ioredis");
 const { createAdapter } = require("@socket.io/redis-adapter");
 
 const httpServer = http.createServer();
-const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
+const SCREEN_API_URL = process.env.INTERNAL_SCREEN_URL || "http://stream-screen:3000";
 
-// Redis clients
 const pubClient = new Redis(REDIS_URL);
 const subClient = pubClient.duplicate();
 const redis = pubClient.duplicate();
 
-// Health check endpoint
-httpServer.on("request", (req, res) => {
-    if ((req.url === "/health" || req.url === "/api/health") && req.method === "GET") {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ status: "ok", service: "stream-socket", redis: redis.status }));
-        return;
-    }
-    res.writeHead(404);
-    res.end();
-});
-
 const io = new Server(httpServer, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    },
+    cors: { origin: "*", methods: ["GET", "POST"] },
     adapter: createAdapter(pubClient, subClient)
 });
 
-io.on("connection", async (socket) => {
-    console.log("Client connected:", socket.id);
+let rotationLock = false;
 
-    // Mandar el último estado conocido al conectar
+// GAMING ENGINE: Heartbeat & State Ticker (5 FPS)
+async function tick() {
     try {
-        const lastPoll = await redis.get("last_poll_data");
-        if (lastPoll) {
-            socket.emit("poll-refresh", JSON.parse(lastPoll));
+        let pollId = await redis.get("current_poll_id");
+
+        // --- BOOTSTRAP: Look for active poll if none in Redis ---
+        if (!pollId) {
+            const pollData = await fetchInternalPoll();
+            if (pollData && pollData.current) {
+                pollId = pollData.current.id;
+                await redis.set("current_poll_id", pollId, "EX", 3600);
+                console.log(`[Engine] Found active poll via API: ${pollId}`);
+            } else {
+                return; // No active poll to tick
+            }
         }
+
+        const stateKey = `fighter:${pollId}`;
+        const rawState = await redis.get(stateKey);
+        if (!rawState) return;
+
+        const state = JSON.parse(rawState);
+        const now = Date.now();
+        const lastUpdate = state.lastUpdate || now;
+        const delta = (now - lastUpdate) / 1000;
+
+        // --- TIMER LOGIC ---
+        if (!state.combatOver) {
+            state.timer = Math.max(0, (state.timer || 180) - delta);
+            rotationLock = false; // Reset lock for new match
+            if (state.timer <= 0) {
+                state.combatOver = true;
+                state.winner = state.fighterA.hp > state.fighterB.hp ? 'A' : 'B';
+                console.log(`[Engine] Time Over! Winner: ${state.winner}`);
+            }
+        }
+
+        // Passive Damage Decay
+        const decay = 0.0005 * delta;
+        state.fighterA.hp = Math.max(0, state.fighterA.hp - decay);
+        state.fighterB.hp = Math.max(0, state.fighterB.hp - decay);
+
+        if (state.fighterA.animation !== 'idle' && (now - (state.fighterA.lastActionTime || 0)) > 600) {
+            state.fighterA.animation = 'idle';
+        }
+        if (state.fighterB.animation !== 'idle' && (now - (state.fighterB.lastActionTime || 0)) > 600) {
+            state.fighterB.animation = 'idle';
+        }
+
+        state.lastUpdate = now;
+
+        // Check for KO
+        if (!state.combatOver && (state.fighterA.hp <= 0 || state.fighterB.hp <= 0)) {
+            state.combatOver = true;
+            state.winner = state.fighterA.hp <= 0 ? 'B' : 'A';
+            console.log(`[Engine] KO Detected! Winner: ${state.winner}`);
+        }
+
+        // --- AUTOMATIC ROTATION TRIGGER ---
+        if (state.combatOver && !rotationLock) {
+            rotationLock = true;
+            console.log(`[Engine] Match ended. Triggering rotation in 8s...`);
+            setTimeout(() => {
+                triggerRotation();
+            }, 8000);
+        }
+
+        await redis.set(stateKey, JSON.stringify(state), 'EX', 3600);
+
+        io.emit("heartbeat", {
+            pollId,
+            combatState: state,
+            ts: now
+        });
+
     } catch (e) {
-        console.error("Redis fetch error:", e);
+        // Silent error
     }
+}
 
-    socket.on("vote", async (data) => {
-        console.log("Vote received:", data);
-        // Propagar inmediatamente
-        io.emit("vote-update", data);
-        io.emit("poll-refresh", { type: "vote", data });
+function triggerRotation() {
+    const url = new URL("/api/poll/rotate", SCREEN_API_URL);
+    const options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    };
 
-        // Registrar actividad en Redis para auditoría rápida o logs calientes
-        await redis.lpush("recent_votes", JSON.stringify({ ...data, ts: Date.now() }));
-        await redis.ltrim("recent_votes", 0, 99);
+    const req = http.request(url, options, (res) => {
+        let body = '';
+        res.on('data', (d) => body += d);
+        res.on('end', () => console.log(`[Engine] Rotation API Response: ${body}`));
     });
 
+    req.on('error', (e) => console.error(`[Engine] Rotation API Error: ${e.message}`));
+    req.end();
+}
+
+async function fetchInternalPoll() {
+    return new Promise((resolve) => {
+        const url = new URL("/api/poll", SCREEN_API_URL);
+        http.get(url, (res) => {
+            let body = '';
+            res.on('data', (d) => body += d);
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(body));
+                } catch (e) {
+                    resolve(null);
+                }
+            });
+        }).on('error', () => resolve(null));
+    });
+}
+
+setInterval(tick, 200);
+
+io.on("connection", async (socket) => {
+    console.log("Remote Node connected:", socket.id);
+    const lastPoll = await redis.get("current_poll_full");
+    if (lastPoll) socket.emit("poll-update", JSON.parse(lastPoll));
+
+    socket.on("vote", (data) => io.emit("vote", data));
     socket.on("poll-update", async (data) => {
-        console.log("Poll update received:", data);
-        // Cachear en Redis para persistencia rápida en reinicios de stream-screen
-        await redis.set("last_poll_data", JSON.stringify(data), "EX", 3600); // 1h
-
-        io.emit("poll-refresh", data);
-        io.emit("vote-update", { type: "poll", data });
+        rotationLock = false; // Important: Unlock when a new poll starts
+        if (data && data.id) await redis.set("current_poll_id", data.id, "EX", 3600);
+        io.emit("poll-update", data);
     });
+    socket.on("shoutout", (data) => io.emit("shoutout", data));
+    socket.on("disconnect", () => console.log("Remote Node disconnected"));
+});
 
-    socket.on("disconnect", () => {
-        console.log("Client disconnected:", socket.id);
-    });
+httpServer.on("request", (req, res) => {
+    if (req.url === "/health") {
+        res.writeHead(200); res.end("OK");
+    } else {
+        res.writeHead(404); res.end();
+    }
 });
 
 const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
-    console.log(`Socket server running on port ${PORT} with Redis Adapter`);
-});
+httpServer.listen(PORT, () => console.log(`Gaming Engine Pulse active on port ${PORT}`));

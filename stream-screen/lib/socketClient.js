@@ -26,10 +26,9 @@ export function createSocketClient() {
             log.debug('Using dynamic URL:', socketUrl);
         }
     } else {
-        // Servidor (Node.js)
-        // Usar el nombre del servicio Docker (puerto interno 3001)
-        socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://stream-socket:3001";
-        log.info('Server-side URL:', socketUrl);
+        // Servidor (Node.js) - Container communication
+        socketUrl = process.env.INTERNAL_SOCKET_URL || "http://stream-socket:3001";
+        log.info('Server-side URL (Internal):', socketUrl);
     }
 
     const socket = io(socketUrl, {

@@ -180,3 +180,4 @@ La sincronización debería funcionar correctamente ahora. Los votos y actualiza
 
 
 
+

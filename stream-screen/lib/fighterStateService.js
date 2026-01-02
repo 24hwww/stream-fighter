@@ -18,8 +18,10 @@ class FighterStateService {
     async initializeState(pollId) {
         const initialState = {
             pollId,
-            fighterA: { hp: 1.0, lastHit: 0, animation: 'idle' },
-            fighterB: { hp: 1.0, lastHit: 0, animation: 'idle' },
+            fighterA: { hp: 1.0, lastHit: 0, animation: 'idle', prevVotes: 0 },
+            fighterB: { hp: 1.0, lastHit: 0, animation: 'idle', prevVotes: 0 },
+            timer: 180, // 3 minutes total
+            lastUpdate: Date.now(),
             events: []
         };
         await this.saveState(pollId, initialState);
@@ -32,6 +34,7 @@ class FighterStateService {
 
     /**
      * Updates HP based on delta votes and triggers animations
+     * Gaming Optimized: Includes passive decay and vote scaling
      */
     async updateCombat(pollId, pollData) {
         const state = await this.getState(pollId);
@@ -39,42 +42,54 @@ class FighterStateService {
         const vA = pollData.optionA?._count?.votes || 0;
         const vB = pollData.optionB?._count?.votes || 0;
 
-        // Detector de cambios en votos
         const deltaA = vA - (state.fighterA.prevVotes || 0);
         const deltaB = vB - (state.fighterB.prevVotes || 0);
 
         const now = Date.now();
+        const lastUpdate = state.lastUpdate || now;
+        const timeDelta = (now - lastUpdate) / 1000;
 
-        // Si P1 (A) recibe un voto, ATACA
-        if (deltaA > 0 && (now - (state.fighterA.lastActionTime || 0)) > 500) {
-            const actions = ['punch', 'kick', 'special'];
-            state.fighterA.animation = actions[Math.floor(Math.random() * actions.length)];
+        // Passive Decay (0.1% per second)
+        const passiveDecay = 0.001 * timeDelta;
+        state.fighterA.hp = Math.max(0, state.fighterA.hp - passiveDecay);
+        state.fighterB.hp = Math.max(0, state.fighterB.hp - passiveDecay);
+
+        // Player A Attacks
+        if (deltaA > 0 && (now - (state.fighterA.lastActionTime || 0)) > 400) {
+            const types = ['punch', 'kick', 'special'];
+            state.fighterA.animation = types[Math.floor(Math.random() * types.length)];
             state.fighterA.lastActionTime = now;
-            // El ataque danyina a B
-            state.fighterB.hp = Math.max(0, state.fighterB.hp - (deltaA * 0.05));
+            const damage = 0.05 + (deltaA * 0.01);
+            state.fighterB.hp = Math.max(0, state.fighterB.hp - damage);
             state.fighterB.lastHit = now;
         }
 
-        // Si P2 (B) recibe un voto, ATACA
-        if (deltaB > 0 && (now - (state.fighterB.lastActionTime || 0)) > 500) {
-            const actions = ['punch', 'kick', 'special'];
-            state.fighterB.animation = actions[Math.floor(Math.random() * actions.length)];
+        // Player B Attacks
+        if (deltaB > 0 && (now - (state.fighterB.lastActionTime || 0)) > 400) {
+            const types = ['punch', 'kick', 'special'];
+            state.fighterB.animation = types[Math.floor(Math.random() * types.length)];
             state.fighterB.lastActionTime = now;
-            // El ataque danyina a A
-            state.fighterA.hp = Math.max(0, state.fighterA.hp - (deltaB * 0.05));
+            const damage = 0.05 + (deltaB * 0.01);
+            state.fighterA.hp = Math.max(0, state.fighterA.hp - damage);
             state.fighterA.lastHit = now;
         }
 
-        // Reset animation after 400ms
-        if (state.fighterA.animation !== 'idle' && (now - state.fighterA.lastActionTime) > 400) {
+        // Animation reset
+        if (state.fighterA.animation !== 'idle' && (now - state.fighterA.lastActionTime) > 600) {
             state.fighterA.animation = 'idle';
         }
-        if (state.fighterB.animation !== 'idle' && (now - state.fighterB.lastActionTime) > 400) {
+        if (state.fighterB.animation !== 'idle' && (now - state.fighterB.lastActionTime) > 600) {
             state.fighterB.animation = 'idle';
         }
 
         state.fighterA.prevVotes = vA;
         state.fighterB.prevVotes = vB;
+        state.lastUpdate = now;
+
+        state.combatOver = state.fighterA.hp <= 0 || state.fighterB.hp <= 0;
+        if (state.combatOver) {
+            state.winner = state.fighterA.hp <= 0 ? 'B' : 'A';
+        }
 
         await this.saveState(pollId, state);
         return state;

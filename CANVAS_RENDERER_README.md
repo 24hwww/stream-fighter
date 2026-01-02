@@ -198,3 +198,4 @@ El sistema detecta automáticamente y usa Canvas si está disponible. No se requ
 
 
 
+

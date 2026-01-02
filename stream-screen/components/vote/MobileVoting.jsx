@@ -1,14 +1,14 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import { createSocketClient } from "@/lib/socketClient";
-import { createLogger } from "@/lib/logger";
-
-const log = createLogger('MobileVoting');
 
 export default function MobileVoting() {
     const [poll, setPoll] = useState(null);
-    const [voted, setVoted] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [votedSide, setVotedSide] = useState(null); // 'A' or 'B'
+    const [isVibrating, setIsVibrating] = useState(false);
+    const [shoutout, setShoutout] = useState("");
+    const [shoutoutStatus, setShoutoutStatus] = useState(null); // 'sending', 'sent'
+    const [latency, setLatency] = useState(0);
     const [isMounted, setIsMounted] = useState(false);
     const socketRef = useRef(null);
 
@@ -20,9 +20,7 @@ export default function MobileVoting() {
                 setPoll(data.current);
             }
         } catch (err) {
-            log.error('Fetch error:', err.message);
-        } finally {
-            setLoading(false);
+            console.error("Fetch error:", err);
         }
     };
 
@@ -30,191 +28,194 @@ export default function MobileVoting() {
         setIsMounted(true);
         fetchPoll();
 
-        // Initialize socket only on client
-        if (!socketRef.current) {
-            socketRef.current = createSocketClient();
-        }
+        const socket = createSocketClient();
+        socketRef.current = socket;
 
-        const socket = socketRef.current;
-
-        socket.on("poll-refresh", () => {
-            log.debug('Poll refreshed via socket');
-            fetchPoll();
-            setVoted(null);
+        const start = Date.now();
+        socket.on("connect", () => {
+            setLatency(Date.now() - start);
         });
 
-        socket.on("vote-update", (data) => {
-            log.debug('Vote update received:', data);
-
-            // Si el socket trae los conteos frescos, actualizamos localmente sin fetch()
-            if (data.optionA_votes !== undefined && data.pollId) {
-                setPoll(prev => {
-                    if (!prev || prev.id !== data.pollId) return prev;
-
-                    // Solo actualizamos si el conteo es mayor al que tenemos (evitar saltos hacia atrás)
-                    const newA = Math.max(prev.optionA._count.votes, data.optionA_votes);
-                    const newB = Math.max(prev.optionB._count.votes, data.optionB_votes);
-
-                    return {
-                        ...prev,
-                        optionA: { ...prev.optionA, _count: { ...prev.optionA._count, votes: newA } },
-                        optionB: { ...prev.optionB, _count: { ...prev.optionB._count, votes: newB } }
-                    };
-                });
-            } else {
-                // Fallback a fetch si el mensaje es incompleto
-                fetchPoll();
-            }
+        socket.on("poll-update", (newPoll) => {
+            setPoll(newPoll);
+            setVotedSide(null);
         });
 
         return () => {
-            if (socket) {
-                socket.off("poll-refresh");
-                socket.off("vote-update");
-                // We keep the socket connection alive as long as the component is mounted
-            }
+            socket.disconnect();
         };
     }, []);
 
-    const handleVote = async (optionId, optionName) => {
-        if (!poll || voted) return;
+    const handleVote = async (side) => {
+        if (!poll) return;
 
-        // --- OPTIMISTIC UI ---
-        setVoted(optionName);
-        setPoll(prev => {
-            if (!prev) return prev;
-            const isA = (optionId === prev.optionA.id || optionName === prev.optionA.name);
-            return {
-                ...prev,
-                optionA: { ...prev.optionA, _count: { ...prev.optionA._count, votes: prev.optionA._count.votes + (isA ? 1 : 0) } },
-                optionB: { ...prev.optionB, _count: { ...prev.optionB._count, votes: prev.optionB._count.votes + (!isA ? 1 : 0) } }
-            };
-        });
+        setVotedSide(side);
+        setIsVibrating(true);
+        setTimeout(() => setIsVibrating(false), 100);
 
-        const id = optionId || (optionName === poll.optionA.name ? poll.optionA.id : poll.optionB.id);
+        // Standard vibration API if available
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(50);
+        }
+
+        const optionId = side === 'A' ? poll.optionA.id : poll.optionB.id;
 
         try {
-            const res = await fetch("/api/vote", {
+            await fetch("/api/vote", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ pollId: poll.id, optionId: id })
+                body: JSON.stringify({ pollId: poll.id, optionId })
             });
-
-            if (!res.ok) {
-                // Si el voto falla en el servidor, revertimos (opcional, o mostramos error)
-                log.error('Vote failed on server');
-                fetchPoll(); // Refrescar para estar seguros
-            }
         } catch (err) {
-            log.error('Vote error:', err.message);
-            fetchPoll(); // Refrescar en caso de error
+            console.error("Vote error:", err);
+        }
+    };
+
+    const sendShoutout = async (e) => {
+        e.preventDefault();
+        if (!shoutout.trim() || shoutoutStatus === 'sending') return;
+
+        setShoutoutStatus('sending');
+        try {
+            await fetch("/api/shoutout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: shoutout })
+            });
+            setShoutout("");
+            setShoutoutStatus('sent');
+            setTimeout(() => setShoutoutStatus(null), 3000);
+        } catch (err) {
+            console.error("Shoutout error:", err);
+            setShoutoutStatus(null);
         }
     };
 
     if (!isMounted) return null;
 
-    if (loading) return (
-        <div className="min-h-screen bg-black flex items-center justify-center">
-            <div className="text-yellow-500 font-black animate-pulse tracking-widest uppercase">
-                PREPARANDO ARENA...
-            </div>
-        </div>
-    );
-
     if (!poll) return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-center gap-4">
-            <div className="text-red-500 text-2xl font-black uppercase italic underline decoration-red-900 underline-offset-8">
-                SIN BATALLA ACTIVA
-            </div>
-            <p className="text-gray-500 text-xs font-mono">ESPERANDO AL SIGUIENTE ROUND</p>
-            <button
-                onClick={fetchPoll}
-                className="mt-4 px-6 py-2 border border-gray-800 text-gray-500 text-[10px] hover:text-white transition-colors"
-            >
-                REINTENTAR
-            </button>
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center text-yellow-500 font-mono p-6">
+            <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mb-6" />
+            <p className="text-xl font-black italic animate-pulse">ESTABLISHING UPLINK...</p>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white font-mono p-6 flex flex-col items-center">
-            <div className="w-full max-w-md pt-4">
-                <header className="text-center mb-8">
-                    <h1 className="text-4xl font-black tracking-tighter italic text-yellow-500 mb-2 drop-shadow-[0_0_15px_rgba(234,179,8,0.3)]">
-                        TU VOTO DECIDE
-                    </h1>
-                    <div className="h-0.5 bg-gradient-to-r from-transparent via-red-600 to-transparent w-full opacity-50"></div>
-                </header>
+        <div className="min-h-screen bg-[#050505] text-white font-mono flex flex-col overflow-hidden">
 
-                <div className="space-y-6">
-                    {/* Option A */}
+            {/* Header: Terminal Style */}
+            <header className="bg-yellow-500 text-black p-4 flex flex-col items-center shadow-[0_0_20px_rgba(234,179,8,0.3)]">
+                <h1 className="text-2xl font-black italic tracking-tighter uppercase leading-none">BRAWL REMOTE NODE</h1>
+                <div className="flex gap-4 mt-2">
+                    <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
+                        <span className="text-[8px] font-bold uppercase tracking-widest">Live Uplink</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <span className="text-[8px] font-bold text-black/60 uppercase tracking-widest">Lat: {latency}ms</span>
+                    </div>
+                </div>
+            </header>
+
+            <main className="flex-1 p-6 flex flex-col gap-6 max-w-md mx-auto w-full">
+
+                {/* Matchup Banner */}
+                <div className="text-center">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-[0.4em] mb-2">Current Combat Simulation</p>
+                    <div className="flex items-center justify-center gap-4">
+                        <span className="text-lg font-black uppercase text-yellow-500 truncate max-w-[120px]">{poll.optionA.name}</span>
+                        <span className="text-zinc-700 italic font-black">VS</span>
+                        <span className="text-lg font-black uppercase text-blue-500 truncate max-w-[120px]">{poll.optionB.name}</span>
+                    </div>
+                </div>
+
+                {/* Team Selector */}
+                <div className="grid grid-cols-2 gap-4">
                     <button
-                        onClick={() => handleVote(poll.optionAId || poll.optionA.id, poll.optionA.name)}
-                        disabled={voted !== null}
-                        className={`w-full relative overflow-hidden rounded-xl border-2 transition-all active:scale-95 duration-200 ${voted === poll.optionA.name
-                            ? 'border-yellow-400 bg-red-900/40 shadow-[0_0_40px_rgba(239,68,68,0.2)]'
-                            : voted
-                                ? 'border-gray-900 opacity-30 grayscale'
-                                : 'border-red-900/50 bg-red-950/20 hover:border-red-600'
+                        onClick={() => handleVote('A')}
+                        className={`h-28 border-4 transition-all relative flex flex-col items-center justify-center p-2 rounded-lg ${votedSide === 'A'
+                                ? 'border-yellow-500 bg-yellow-500/20 shadow-[0_0_20px_rgba(234,179,8,0.5)]'
+                                : 'border-zinc-900 bg-zinc-900/50 hover:border-zinc-700'
                             }`}
                     >
-                        <div className="p-5 flex items-center justify-between">
-                            <div className="flex-1 text-left">
-                                <div className="text-[9px] font-bold text-red-500/80 mb-1 tracking-widest uppercase">GUERRERO A</div>
-                                <div className="text-2xl font-black uppercase tracking-tight leading-none truncate pr-2">
-                                    {poll.optionA.name}
-                                </div>
-                            </div>
-                            <div className="text-3xl font-black text-red-600 italic">
-                                {Math.round(((poll.optionA?._count?.votes || 0) / ((poll.optionA?._count?.votes || 0) + (poll.optionB?._count?.votes || 0) || 1)) * 100)}%
-                            </div>
-                        </div>
+                        <span className="text-[9px] font-bold text-zinc-500 absolute top-2 uppercase">Team A</span>
+                        <span className="font-black text-sm uppercase text-center mt-2 leading-tight">{poll.optionA.name}</span>
+                        {votedSide === 'A' && <div className="absolute inset-0 bg-yellow-500/10 animate-pulse rounded-lg" />}
                     </button>
 
-                    <div className="flex items-center justify-center py-0">
-                        <span className="text-lg font-black text-white/5 italic tracking-[0.5em]">VERSUS</span>
-                    </div>
-
-                    {/* Option B */}
                     <button
-                        onClick={() => handleVote(poll.optionBId || poll.optionB.id, poll.optionB.name)}
-                        disabled={voted !== null}
-                        className={`w-full relative overflow-hidden rounded-xl border-2 transition-all active:scale-95 duration-200 ${voted === poll.optionB.name
-                            ? 'border-yellow-400 bg-blue-900/40 shadow-[0_0_40px_rgba(59,130,246,0.2)]'
-                            : voted
-                                ? 'border-gray-900 opacity-30 grayscale'
-                                : 'border-blue-900/50 bg-blue-950/20 hover:border-blue-600'
+                        onClick={() => handleVote('B')}
+                        className={`h-28 border-4 transition-all relative flex flex-col items-center justify-center p-2 rounded-lg ${votedSide === 'B'
+                                ? 'border-blue-500 bg-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.5)]'
+                                : 'border-zinc-900 bg-zinc-900/50 hover:border-zinc-700'
                             }`}
                     >
-                        <div className="p-5 flex items-center justify-between">
-                            <div className="flex-1 text-left">
-                                <div className="text-[9px] font-bold text-blue-500/80 mb-1 tracking-widest uppercase">GUERRERO B</div>
-                                <div className="text-2xl font-black uppercase tracking-tight leading-none truncate pr-2">
-                                    {poll.optionB.name}
-                                </div>
-                            </div>
-                            <div className="text-3xl font-black text-blue-600 italic">
-                                {Math.round(((poll.optionB?._count?.votes || 0) / ((poll.optionA?._count?.votes || 0) + (poll.optionB?._count?.votes || 0) || 1)) * 100)}%
-                            </div>
-                        </div>
+                        <span className="text-[9px] font-bold text-zinc-500 absolute top-2 uppercase">Team B</span>
+                        <span className="font-black text-sm uppercase text-center mt-2 leading-tight">{poll.optionB.name}</span>
+                        {votedSide === 'B' && <div className="absolute inset-0 bg-blue-500/10 animate-pulse rounded-lg" />}
                     </button>
                 </div>
 
-                {voted && (
-                    <div className="mt-10 text-center animate-bounce">
-                        <div className="inline-block px-8 py-2.5 bg-yellow-500 text-black font-black uppercase text-xs rounded-full tracking-tighter shadow-xl">
-                            ¡VOTO REGISTRADO!
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            <footer className="mt-auto pb-10 flex flex-col items-center gap-4 w-full">
-                <div className="flex items-center gap-3 text-[9px] font-bold text-white/20 uppercase tracking-[0.4em]">
-                    <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-ping"></div>
-                    ARENA LIVE • SINCRONIZADO
+                {/* Main Action Trigger */}
+                <div className="flex-1 flex flex-col items-center justify-center py-4">
+                    <div className="text-[10px] text-zinc-600 uppercase font-bold mb-4 tracking-widest">Execute Combat Command</div>
+                    <button
+                        onClick={() => votedSide && handleVote(votedSide)}
+                        disabled={!votedSide}
+                        className={`w-48 h-48 rounded-full border-8 transition-all flex flex-col items-center justify-center box-border ${!votedSide
+                                ? 'border-zinc-900 bg-zinc-950 text-zinc-800'
+                                : votedSide === 'A'
+                                    ? 'border-yellow-500 bg-yellow-500/10 text-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.4)] active:scale-90 active:brightness-150'
+                                    : 'border-blue-500 bg-blue-500/10 text-blue-500 shadow-[0_0_40px_rgba(59,130,246,0.4)] active:scale-90 active:brightness-150'
+                            } ${isVibrating ? 'scale-105' : ''}`}
+                    >
+                        <span className="text-4xl mb-1">⚡</span>
+                        <span className="text-xl font-black italic tracking-tighter">ACTION</span>
+                    </button>
+                    <div className="text-[8px] text-zinc-700 mt-4 uppercase tracking-[0.3em]">Spam to trigger attacks</div>
                 </div>
+
+                {/* Shoutout Box */}
+                <div className="bg-zinc-900/80 border-t-2 border-yellow-500/30 p-4 rounded-t-2xl">
+                    <p className="text-[10px] text-yellow-500 font-bold mb-3 uppercase tracking-widest flex justify-between">
+                        <span>Transmission Feeder</span>
+                        <span className="opacity-50 font-mono">CH-88</span>
+                    </p>
+                    <form onSubmit={sendShoutout} className="flex gap-2">
+                        <input
+                            type="text"
+                            maxLength={35}
+                            value={shoutout}
+                            onChange={(e) => setShoutout(e.target.value)}
+                            placeholder="Type a live shoutout..."
+                            className="flex-1 bg-black border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-yellow-500 transition-colors uppercase font-mono tracking-tight"
+                        />
+                        <button
+                            type="submit"
+                            disabled={!shoutout.trim() || shoutoutStatus === 'sending'}
+                            className={`px-4 rounded-lg font-black text-xs uppercase transition-all ${shoutoutStatus === 'sent'
+                                    ? 'bg-green-500 text-white'
+                                    : 'bg-yellow-500 text-black hover:bg-white active:scale-95 disabled:opacity-20'
+                                }`}
+                        >
+                            {shoutoutStatus === 'sending' ? '...' : shoutoutStatus === 'sent' ? 'OK!' : 'SEND'}
+                        </button>
+                    </form>
+                </div>
+            </main>
+
+            <footer className="p-4 bg-black border-t border-zinc-900 text-[8px] text-zinc-600 text-center uppercase tracking-[0.5em] leading-relaxed">
+                Terminal Auth: <span className="text-zinc-400">0xEF82...B1A2</span><br />
+                PIXEL-BRAWL NETWORKS V2.0
             </footer>
+
+            <style jsx global>{`
+                @keyframes pulse-ring {
+                    0% { transform: scale(0.9); opacity: 0.5; }
+                    50% { transform: scale(1.1); opacity: 0.8; }
+                    100% { transform: scale(0.9); opacity: 0.5; }
+                }
+            `}</style>
         </div>
     );
 }

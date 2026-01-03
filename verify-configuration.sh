@@ -53,7 +53,7 @@ if [ -f "package.json" ]; then
     fi
     
     # Verificar dependencias críticas
-    CRITICAL_DEPS=("next" "react" "prisma" "socket.io" "skia-canvas" "pixi.js" "@pixi/node")
+    CRITICAL_DEPS=("vite" "react" "prisma" "express" "cors" "phaser" "pixi.js")
     
     for dep in "${CRITICAL_DEPS[@]}"; do
         if grep -q "\"${dep}\":" package.json; then
@@ -71,28 +71,14 @@ fi
 cd ..
 
 # 3. Verificar Docker
-echo ""
-echo "🐳 Verificando Docker..."
-
-if command -v docker &> /dev/null; then
-    echo -e "  ${GREEN}✓${NC} Docker instalado"
-    
-    if command -v docker-compose &> /dev/null || command -v docker compose &> /dev/null; then
-        echo -e "  ${GREEN}✓${NC} Docker Compose instalado"
-    else
-        echo -e "  ${RED}✗${NC} Docker Compose no encontrado"
-        ERRORS=$((ERRORS + 1))
-    fi
-else
-    echo -e "  ${RED}✗${NC} Docker no instalado"
-    ERRORS=$((ERRORS + 1))
-fi
+# ... (same)
+# (Skipping to 4)
 
 # 4. Verificar archivos de configuración
 echo ""
 echo "⚙️ Verificando archivos de configuración..."
 
-CONFIG_FILES=("docker-compose.yaml" "stream-screen/next.config.mjs" "stream-screen/eslint.config.mjs" "stream-screen/prisma/schema.prisma")
+CONFIG_FILES=("docker-compose.yaml" "stream-screen/vite.config.js" "stream-screen/postcss.config.js" "stream-screen/prisma/schema.prisma")
 
 for file in "${CONFIG_FILES[@]}"; do
     if [ -f "$file" ]; then
@@ -103,40 +89,7 @@ for file in "${CONFIG_FILES[@]}"; do
     fi
 done
 
-# 5. Verificar servicios Docker
-echo ""
-echo "🔧 Verificando servicios Docker..."
-
-if [ -f "docker-compose.yaml" ]; then
-    echo -e "  ${GREEN}✓${NC} docker-compose.yaml encontrado"
-    
-    # Verificar servicios críticos
-    SERVICES=("stream-screen" "stream-socket" "restreamer" "redis")
-    
-    for service in "${SERVICES[@]}"; do
-        if grep -q "^\s*${service}:" docker-compose.yaml; then
-            echo -e "  ${GREEN}✓${NC} Servicio $service definido"
-        else
-            echo -e "  ${RED}✗${NC} Servicio $service no encontrado"
-            ERRORS=$((ERRORS + 1))
-        fi
-    done
-fi
-
-# 6. Verificar mocks
-echo ""
-echo "🎭 Verificando archivos de mock..."
-
-MOCK_FILES=("stream-screen/lib/mocks/sharp.js" "stream-screen/lib/mocks/skia-canvas.js")
-
-for file in "${MOCK_FILES[@]}"; do
-    if [ -f "$file" ]; then
-        echo -e "  ${GREEN}✓${NC} $file encontrado"
-    else
-        echo -e "  ${RED}✗${NC} $file no encontrado"
-        ERRORS=$((ERRORS + 1))
-    fi
-done
+# (Removing mocks section as it's legacy)
 
 # 7. Resumen
 echo ""

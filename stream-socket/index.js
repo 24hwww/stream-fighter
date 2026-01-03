@@ -2,7 +2,9 @@ const { Server } = require("socket.io");
 const http = require("http");
 const Redis = require("ioredis");
 const { createAdapter } = require("@socket.io/redis-adapter");
+const { createLogger } = require("./lib/logger");
 
+const log = createLogger('SocketEngine');
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
 const SCREEN_API_URL = process.env.INTERNAL_SCREEN_URL || "http://stream-screen:3000";
 
@@ -35,13 +37,13 @@ async function tick() {
             if (pollData && pollData.current) {
                 pollId = pollData.current.id;
                 await redis.set("current_poll_id", pollId, "EX", 3600);
-                console.log(\`[Engine] Found active poll via API: \${pollId}\`);
+                log.info(`Found active poll via API: ${pollId}`);
             } else {
                 return; // No active poll to tick
             }
         }
 
-        const stateKey = \`fighter:\${pollId}\`;
+        const stateKey = `fighter:${pollId}`;
         const rawState = await redis.get(stateKey);
         if (!rawState) return;
 
@@ -57,7 +59,7 @@ async function tick() {
             if (state.timer <= 0) {
                 state.combatOver = true;
                 state.winner = state.fighterA.hp > state.fighterB.hp ? 'A' : 'B';
-                console.log(\`[Engine] Time Over! Winner: \${state.winner}\`);
+                log.info(`Time Over! Winner: ${state.winner}`);
             }
         }
 
@@ -79,13 +81,13 @@ async function tick() {
         if (!state.combatOver && (state.fighterA.hp <= 0 || state.fighterB.hp <= 0)) {
             state.combatOver = true;
             state.winner = state.fighterA.hp <= 0 ? 'B' : 'A';
-            console.log(\`[Engine] KO Detected! Winner: \${state.winner}\`);
+            log.info(`KO Detected! Winner: ${state.winner}`);
         }
 
         // --- AUTOMATIC ROTATION TRIGGER ---
         if (state.combatOver && !rotationLock) {
             rotationLock = true;
-            console.log(\`[Engine] Match ended. Triggering rotation in 8s...\`);
+            log.info('Match ended. Triggering rotation in 8s...');
             setTimeout(() => {
                 triggerRotation();
             }, 8000);
@@ -116,10 +118,10 @@ function triggerRotation() {
     const req = http.request(url, options, (res) => {
         let body = '';
         res.on('data', (d) => body += d);
-        res.on('end', () => console.log(\`[Engine] Rotation API Response: \${body}\`));
+        res.on('end', () => log.info(`Rotation API Response: ${body}`));
     });
 
-    req.on('error', (e) => console.error(\`[Engine] Rotation API Error: \${e.message}\`));
+    req.on('error', (e) => log.error(`Rotation API Error: ${e.message}`, e));
     req.end();
 }
 
@@ -143,7 +145,7 @@ async function fetchInternalPoll() {
 setInterval(tick, 200);
 
 io.on("connection", async (socket) => {
-    console.log("Remote Node connected:", socket.id);
+    log.info(`Remote Node connected: ${socket.id}`);
     const lastPoll = await redis.get("current_poll_full");
     if (lastPoll) socket.emit("poll-update", JSON.parse(lastPoll));
 
@@ -154,8 +156,8 @@ io.on("connection", async (socket) => {
         io.emit("poll-update", data);
     });
     socket.on("shoutout", (data) => io.emit("shoutout", data));
-    socket.on("disconnect", () => console.log("Remote Node disconnected"));
+    socket.on("disconnect", () => log.info(`Remote Node disconnected: ${socket.id}`));
 });
 
 const PORT = 3001;
-httpServer.listen(PORT, () => console.log(\`Gaming Engine Pulse active on port \${PORT}\`));
+httpServer.listen(PORT, () => log.info(`Gaming Engine Pulse active on port ${PORT}`));

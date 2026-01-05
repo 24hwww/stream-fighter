@@ -83,12 +83,46 @@ export class MainScene extends Phaser.Scene {
         this.cameras.main.centerOn(centerX, centerY);
     }
 
-    updateGameState(combatState) {
-        if (!this.player || !this.enemy || !combatState) return;
+    update(time, delta) {
+        if (this.gameOver || !this.player || !this.enemy) return;
 
-        if (combatState.fighterA) this.player.update(combatState.fighterA);
-        if (combatState.fighterB) this.enemy.update(combatState.fighterB);
+        const distance = Math.abs(this.player.x - this.enemy.x);
+        const combatRange = 100;
+        const walkSpeed = 1.5;
 
+        // --- AUTONOMOUS MOVEMENT (Proximity Logic) ---
+        if (distance > combatRange) {
+            // Move towards each other
+            if (this.player.x < this.enemy.x) {
+                this.player.x += walkSpeed;
+                this.enemy.x -= walkSpeed;
+            } else {
+                this.player.x -= walkSpeed;
+                this.enemy.x += walkSpeed;
+            }
+
+            // Set walking animations if not attacking
+            if (this.player.currentAnimation === 'idle') {
+                this.player.play(`${this.playerKey}_walk`, true);
+                this.player.currentAnimation = 'walk';
+            }
+            if (this.enemy.currentAnimation === 'idle') {
+                this.enemy.play(`${this.enemyKey}_walk`, true);
+                this.enemy.currentAnimation = 'walk';
+            }
+        } else {
+            // Close enough, return to idle if not attacking
+            if (this.player.currentAnimation === 'walk') {
+                this.player.play(`${this.playerKey}_idle`, true);
+                this.player.currentAnimation = 'idle';
+            }
+            if (this.enemy.currentAnimation === 'walk') {
+                this.enemy.play(`${this.enemyKey}_idle`, true);
+                this.enemy.currentAnimation = 'idle';
+            }
+        }
+
+        // --- FACE EACH OTHER ---
         if (this.player.x < this.enemy.x) {
             this.player.setFlipX(false);
             this.enemy.setFlipX(true);
@@ -97,8 +131,17 @@ export class MainScene extends Phaser.Scene {
             this.enemy.setFlipX(false);
         }
 
+        // Dynamic Camera follow
         const avgX = (this.player.x + this.enemy.x) / 2;
         const targetScrollX = avgX - (this.cameras.main.width / 2);
         this.cameras.main.scrollX = Phaser.Math.Linear(this.cameras.main.scrollX, targetScrollX, 0.05);
+    }
+
+    updateGameState(combatState) {
+        if (!this.player || !this.enemy || !combatState) return;
+
+        // Update properties that come from server (hp, triggering special anims)
+        if (combatState.fighterA) this.player.update(combatState.fighterA);
+        if (combatState.fighterB) this.enemy.update(combatState.fighterB);
     }
 }

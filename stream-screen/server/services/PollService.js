@@ -127,6 +127,7 @@ export class PollService {
         // Atomic increment in Redis for instantaneous feedback
         const redisKey = `votes_count_${pollId}_${optionId}`;
         const currentVotes = await redis.incr(redisKey);
+        log.info(`Vote received: Poll ${pollId}, Option ${optionId}. Current count: ${currentVotes}`);
 
         // Background sync to Postgres (Debounced/Queued would be better, but this is a start)
         prisma.vote.create({ data: { pollId, optionId } }).catch(e => log.error('DB Vote sync error:', e.message));
@@ -141,10 +142,8 @@ export class PollService {
 
                 await redis.set(POLL_CACHE_KEY, JSON.stringify(pollData), "EX", 305);
 
-                // Calculate Combat State - REMOVED: Now handled by stream-socket central authority
-                // const combatState = await fighterStateService.updateCombat(pollId, pollData);
-
                 // Broadcast update - Only broadcast the new vote counts. Heartbeat from socket handles state.
+                log.info(`Broadcasting vote update to socket: Poll ${pollId}`);
                 socket.emit("vote", {
                     pollId,
                     optionA_votes: pollData.optionA._count.votes,

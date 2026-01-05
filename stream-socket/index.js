@@ -197,7 +197,10 @@ io.on("connection", async (socket) => {
     const lastPoll = await redis.get("current_poll_full");
     if (lastPoll) socket.emit("poll-update", JSON.parse(lastPoll));
 
-    socket.on("vote", (data) => io.emit("vote", data));
+    socket.on("vote", (data) => {
+        log.info(`Vote Received from Remote Node: Poll ${data.pollId}`);
+        io.emit("vote", data);
+    });
     socket.on("poll-update", async (data) => {
         rotationLock = false; // Important: Unlock when a new poll starts
         if (data && data.id) await redis.set("current_poll_id", data.id, "EX", 3600);

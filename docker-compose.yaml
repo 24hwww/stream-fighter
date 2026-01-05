@@ -51,7 +51,7 @@ services:
       - "3011:3001"
     environment:
       - REDIS_URL=redis://redis:6379
-      - INTERNAL_SCREEN_URL=http://stream-screen:3000
+      - INTERNAL_SCREEN_URL=http://stream-screen:3010
     env_file:
       - .env
     depends_on:

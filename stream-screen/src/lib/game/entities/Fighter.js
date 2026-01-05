@@ -43,16 +43,22 @@ export class Fighter extends Phaser.Physics.Arcade.Sprite {
         // If 'punch' or 'kick', we play it.
 
         if (targetAnim !== this.currentAnimation) {
+            // Transition to new animation
             this.currentAnimation = targetAnim;
             this.play(`${this.characterName}_${targetAnim}`, true);
 
-            if (targetAnim === 'punch' || targetAnim === 'kick') {
-                // Optional: Add some velocity/lunging effect locally
-                // this.setVelocityX(this.flipX ? -20 : 20);
+            // EFFECT: Small forward lunge on attack
+            if (targetAnim === 'punch' || targetAnim === 'kick' || targetAnim === 'special') {
+                const moveAmount = 15;
+                const dir = this.flipX ? -1 : 1;
+                this.scene.tweens.add({
+                    targets: this,
+                    x: this.x + (moveAmount * dir),
+                    duration: 100,
+                    yoyo: true,
+                    ease: 'Power1'
+                });
             }
-        } else {
-            // If animation is same loop, ensure it's playing
-            // this.play(`${this.characterName}_${targetAnim}`, true);
         }
 
         // Update hitbox or other elements

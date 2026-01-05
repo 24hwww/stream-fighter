@@ -37,12 +37,14 @@ app.get('/api/poll', async (req, res) => {
             poll = await PollService.rotatePoll("General");
         }
 
+        /* Let combat state be handled by stream-socket exclusively
         let combatState = null;
         if (poll) {
             combatState = await fighterStateService.updateCombat(poll.id, poll);
         }
+        */
         const previous = await PollService.getPreviousPoll();
-        res.json({ current: poll, previous, combatState });
+        res.json({ current: poll, previous });
     } catch (e) {
         log.error('Poll API Error:', e.message);
         const fallbackPoll = {
@@ -127,8 +129,18 @@ app.post('/api/ai/news', async (req, res) => {
         const text = data.choices?.[0]?.message?.content?.trim() || "LIVE: BATTLE IN PROGRESS";
         res.json({ text });
     } catch (error) {
-        log.error("AI API Error:", error);
-        res.status(500).json({ text: "LIVE: SYSTEM ERROR" });
+        log.error("AI API Error (using fallback):", error.message);
+
+        const FALLBACK_HEADLINES = [
+            "LIVE: BATTLE IN PROGRESS",
+            "BREAKING: NEW CHALLENGER APPROACHING",
+            "THE ARENA IS HEATING UP",
+            "CROWD GOES WILD FOR THIS MATCH",
+            "WHO WILL BE THE CHAMPION?",
+            "LEGENDARY FIGHTERS CLASH TONIGHT"
+        ];
+        const text = FALLBACK_HEADLINES[Math.floor(Math.random() * FALLBACK_HEADLINES.length)];
+        res.json({ text }); // Return 200 OK with fallback
     }
 });
 
@@ -144,8 +156,17 @@ app.use((err, req, res, _next) => {
     });
 });
 
-app.get('/:path*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../dist/index.html'));
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
+// SPA fallback - must be after all other routes
+app.use((req, res, next) => {
+    if (req.method === 'GET' && req.accepts('html')) {
+        res.sendFile(path.join(__dirname, '../dist/index.html'));
+    } else {
+        next();
+    }
 });
 
 // Global error handlers

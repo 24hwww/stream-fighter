@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createSocketClient } from "../../lib/socketClient.js";
 import { QRCodeSVG } from "qrcode.react";
 import PhaserGame from "./PhaserGame.jsx";
@@ -13,27 +13,9 @@ const formatTimer = (seconds) => {
 export default function ArcadeContainer() {
     const [poll, setPoll] = useState(null);
     const [combatState, setCombatState] = useState(null);
-    const [tickerMessages, setTickerMessages] = useState(["PIXEL BRAWL ARENA LIVE", "SCAN QR TO JOIN THE BATTLE", "VOTE TO TRIGGER ATTACKS"]);
     const [winner, setWinner] = useState(null);
     const [remoteNodeCount] = useState(() => Math.floor(Math.random() * 50) + 120);
     const socketRef = useRef(null);
-
-    // Stable function references using useCallback
-    const fetchInitialHeadline = useCallback(async (matchupStr) => {
-        try {
-            const res = await fetch("/api/ai/news", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: `Generate a short hype headline for ${matchupStr}` })
-            });
-            const data = await res.json();
-            if (data.text) {
-                setTickerMessages(prev => [...prev, data.text.toUpperCase()]);
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    }, []);
 
     const checkWinner = useCallback((state, currentPoll) => {
         if (!state || !currentPoll) return;
@@ -48,21 +30,13 @@ export default function ArcadeContainer() {
         });
     }, []);
 
-    // Initial Fetch
+    // Initial Fetch + Socket Setup
     useEffect(() => {
-        // TODO: Update these API calls to point to the backend service explicitly or via proxy
         fetch("/api/poll")
             .then(res => res.json())
             .then(data => {
                 if (data.current) {
                     setPoll(data.current);
-                    if (data.combatState) {
-                        setCombatState(data.combatState);
-                        checkWinner(data.combatState, data.current);
-                    }
-                    if (data.current.optionA && data.current.optionB) {
-                        fetchInitialHeadline(`${data.current.optionA.name} VS ${data.current.optionB.name}`);
-                    }
                 }
             })
             .catch(err => console.error("Poll fetch error", err));
@@ -75,7 +49,18 @@ export default function ArcadeContainer() {
             // High-frequency sync from server pulse
             if (data.combatState) {
                 setCombatState(data.combatState);
-                checkWinner(data.combatState, poll);
+                // Need current poll for winner checking
+                // We use a functional update for setWinner inside checkWinner or similar
+                // But for simplicity here, we'll just use the combatState winner if present
+                if (data.combatState.combatOver && data.combatState.winner) {
+                    // Logic to set winner name based on A/B
+                    setPoll(currentPoll => {
+                        if (currentPoll) {
+                            setWinner(data.combatState.winner === 'A' ? currentPoll.optionA.name : currentPoll.optionB.name);
+                        }
+                        return currentPoll;
+                    });
+                }
             }
         });
 
@@ -90,22 +75,19 @@ export default function ArcadeContainer() {
             });
         });
 
-        socket.on("shoutout", (data) => {
-            const formatted = `[SHOUTOUT] ${data.user}: ${data.message}`;
-            setTickerMessages(prev => [...prev.slice(-10), formatted]);
-        });
-
         socket.on("poll-update", (newPoll) => {
             setPoll(newPoll);
             setCombatState(null);
             setWinner(null);
-            if (newPoll.optionA && newPoll.optionB) {
-                fetchInitialHeadline(`${newPoll.optionA.name} VS ${newPoll.optionB.name}`);
-            }
         });
 
-        return () => socket.disconnect();
-    }, [checkWinner, fetchInitialHeadline, poll]);
+        return () => {
+            socket.off("heartbeat");
+            socket.off("vote");
+            socket.off("shoutout");
+            socket.off("poll-update");
+        };
+    }, []); // REMOVED poll from dependencies to break infinite loop
 
     // Derived Matchup Data for Phaser
     const matchup = poll ? {
@@ -202,25 +184,6 @@ export default function ArcadeContainer() {
                         <div className="mt-8 text-zinc-400 text-sm animate-pulse">GENERATING NEXT ROUND...</div>
                     </div>
                 )}
-
-                {/* Ticker Bottom */}
-                <div className="absolute bottom-0 left-0 w-full h-16 bg-zinc-900 border-t-4 border-yellow-500 z-30 flex items-center shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
-                    <div className="bg-yellow-500 text-black font-black text-xl px-6 h-full flex items-center justify-center whitespace-nowrap z-40">
-                        BRAWL TICKER
-                    </div>
-                    <div className="flex-1 overflow-hidden relative h-full flex items-center bg-black/50">
-                        <div className="text-white uppercase font-mono text-2xl tracking-tight animate-marquee inline-block whitespace-nowrap px-4">
-                            {tickerMessages.map((m, i) => (
-                                <React.Fragment key={i}>
-                                    <span className="mx-8 text-yellow-500 italic font-black">///</span>
-                                    <span>{m}</span>
-                                </React.Fragment>
-                            ))}
-                            <span className="mx-8 text-yellow-500 italic font-black">///</span>
-                            JOIN THE FIGHT AT {voteUrl.replace(/^https?:\/\//, '').toUpperCase()}
-                        </div>
-                    </div>
-                </div>
 
                 {/* Game Layer */}
                 <div className="absolute inset-0 z-0 scale-105 blur-[1px]">

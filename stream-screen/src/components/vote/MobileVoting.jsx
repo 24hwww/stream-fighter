@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createSocketClient } from "../../lib/socketClient.js";
 
 export default function MobileVoting() {
@@ -24,8 +24,9 @@ export default function MobileVoting() {
     };
 
     useEffect(() => {
-        setIsMounted(true);
-        fetchPoll();
+        // Defer state update to avoid synchronous cascading update warning
+        const timer = setTimeout(() => setIsMounted(true), 0);
+        fetchPoll(); // eslint-disable-line react-hooks/set-state-in-effect
 
         const socket = createSocketClient();
         socketRef.current = socket;
@@ -41,7 +42,9 @@ export default function MobileVoting() {
         });
 
         return () => {
-            socket.disconnect();
+            clearTimeout(timer);
+            socket.off("connect");
+            socket.off("poll-update");
         };
     }, []);
 

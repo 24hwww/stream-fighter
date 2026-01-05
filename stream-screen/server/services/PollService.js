@@ -141,15 +141,15 @@ export class PollService {
 
                 await redis.set(POLL_CACHE_KEY, JSON.stringify(pollData), "EX", 305);
 
-                // Calculate Combat State
-                const combatState = await fighterStateService.updateCombat(pollId, pollData);
+                // Calculate Combat State - REMOVED: Now handled by stream-socket central authority
+                // const combatState = await fighterStateService.updateCombat(pollId, pollData);
 
-                // Broadcast update
+                // Broadcast update - Only broadcast the new vote counts. Heartbeat from socket handles state.
                 socket.emit("vote", {
                     pollId,
                     optionA_votes: pollData.optionA._count.votes,
-                    optionB_votes: pollData.optionB._count.votes,
-                    combatState
+                    optionB_votes: pollData.optionB._count.votes
+                    // combatState (Not included here anymore)
                 });
             }
         }

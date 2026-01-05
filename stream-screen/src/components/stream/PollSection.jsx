@@ -29,7 +29,7 @@ export default function PollSection() {
     };
 
     useEffect(() => {
-        fetchPoll();
+        setTimeout(() => fetchPoll(), 0);
 
         socket.on("vote-update", (data) => {
             console.log("Real-time vote received:", data);

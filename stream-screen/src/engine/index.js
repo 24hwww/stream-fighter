@@ -13,9 +13,9 @@ const createCanvas = (w, h) => {
         canvas.width = w;
         canvas.height = h;
         return canvas;
-    } else if (typeof global !== 'undefined' && global.Canvas) {
+    } else if (typeof globalThis !== 'undefined' && globalThis.Canvas) {
         // Node environment with global Canvas (passed from service)
-        return new global.Canvas(w, h);
+        return new globalThis.Canvas(w, h);
     } else {
         console.warn("Canvas implementation not found. Pre-rasterization skipped.");
         return null;

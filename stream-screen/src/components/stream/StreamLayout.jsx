@@ -1,8 +1,8 @@
 "use client";
 import React from "react";
-import PollSection from "./PollSection";
-import Sidebar from "./Sidebar";
-import Footer from "./Footer";
+// import PollSection from "./PollSection";
+// import Sidebar from "./Sidebar";
+// import Footer from "./Footer";
 
 export default function StreamLayout({ config = {} }) {
     const title = config.title || "EL GRAN VERSUS";

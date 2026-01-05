@@ -1,6 +1,6 @@
 // Test script for minimalist character generation
-import { Anatomy } from './stream-screen/engine/characters/anatomy.js';
-import { Palette } from './stream-screen/engine/sprites/palette.js';
+import { Anatomy } from './stream-screen/src/engine/characters/anatomy.js';
+import { Palette } from './stream-screen/src/engine/sprites/palette.js';
 
 console.log('Testing Ultra-Minimalist Character Generation...');
 

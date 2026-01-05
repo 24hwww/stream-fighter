@@ -58,11 +58,17 @@ export async function generateNewPoll(categoryName = "General") {
       stage: stage
     };
   } catch (error) {
-    console.error("AI Generation failed, using fallback:", error);
+    console.error("AI Generation failed, using fallback:", error.message);
+
+    // Pick two distinct random characters from ROSTER
+    const shuffled = [...ROSTER].sort(() => 0.5 - Math.random());
+    const charA = shuffled[0];
+    const charB = shuffled[1];
+
     return {
-      optionA: { name: "Warrior A", characterKey: "ninja" },
-      optionB: { name: "Warrior B", characterKey: "pirate" },
-      stage: STAGES[0]
+      optionA: { name: charA.key.toUpperCase(), characterKey: charA.key },
+      optionB: { name: charB.key.toUpperCase(), characterKey: charB.key },
+      stage: STAGES[Math.floor(Math.random() * STAGES.length)]
     };
   }
 }

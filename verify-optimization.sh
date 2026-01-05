@@ -56,7 +56,7 @@ echo ""
 echo "🏥 Verificando health checks..."
 
 # Stream-screen
-check_service "stream-screen" "http://localhost:3010/api/health" "ok" || true
+check_service "stream-screen" "http://localhost:3000/api/health" "OK" || true
 
 # Stream-socket
 check_service "stream-socket" "http://localhost:3011/health" "ok" || true

@@ -38,11 +38,11 @@ export default function Sidebar() {
         }
       }
     };
-    
+
     fetchBaseUrl();
   }, []);
 
-  const [origin, setOrigin] = React.useState("");
+  // const [origin, setOrigin] = React.useState("");
 
   return (
     <div className="flex flex-col h-full gap-6">
@@ -86,7 +86,7 @@ export default function Sidebar() {
           <DollarSign size={10} /> Apoya el Stream
         </div>
         <div className="p-1 bg-white rounded-lg">
-          <QRCodeSVG value={process.env.NEXT_PUBLIC_DONATION_URL || "https://paypal.me/yourid"} size={60} level="H" />
+          <QRCodeSVG value={import.meta.env.VITE_DONATION_URL || "https://paypal.me/yourid"} size={60} level="H" />
         </div>
       </div>
     </div>

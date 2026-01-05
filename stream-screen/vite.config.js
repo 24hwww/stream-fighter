@@ -16,9 +16,20 @@ export default defineConfig({
     strictPort: false, // Allow fallback if port is busy
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3010',
         changeOrigin: true,
       },
+    }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          game: ['phaser', 'pixi.js', 'three'],
+          utils: ['axios', 'zod'] // removed date-fns
+        }
+      }
     }
   }
 })

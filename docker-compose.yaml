@@ -8,6 +8,7 @@ services:
       - "3000:3000"
     volumes:
       - ./stream-screen:/app
+      - /app/node_modules
     environment:
       - NODE_ENV=development
       - WATCHPACK_POLLING=true
@@ -16,6 +17,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - RTMP_URL=rtmp://restreamer:1935/live
       - USE_CANVAS_RENDERER=true
+      - PORT=3010
     env_file:
       - .env
     restart: unless-stopped

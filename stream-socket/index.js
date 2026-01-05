@@ -68,6 +68,54 @@ async function tick() {
         state.fighterA.hp = Math.max(0, state.fighterA.hp - decay);
         state.fighterB.hp = Math.max(0, state.fighterB.hp - decay);
 
+        // --- COMBAT LOGIC (Centralized) ---
+        // Read current vote counts from Redis (Atomic counters)
+        const voteKeyA = `votes_count_${pollId}_${state.fighterA.id || 'A'}`; // Note: OptionID might be needed, but we can fallback to state tracking if IDs aren't in state. 
+        // Actually, we need the Option IDs to read the specific keys. 
+        // Let's get the poll data "current_poll_full" to know the Option IDs if needed, or rely on a simplified key structure if possible.
+        // PollService uses `votes_count_${pollId}_${optionId}`.
+        // We need to know optionIds. Let's grab the full poll once if we don't have it.
+
+        let pollData = null;
+        const cachedPoll = await redis.get("current_poll_full");
+        if (cachedPoll) {
+            pollData = JSON.parse(cachedPoll);
+        }
+
+        if (pollData && pollData.id === pollId) {
+            const idA = pollData.optionA.id;
+            const idB = pollData.optionB.id;
+
+            const vA = parseInt(await redis.get(`votes_count_${pollId}_${idA}`) || 0);
+            const vB = parseInt(await redis.get(`votes_count_${pollId}_${idB}`) || 0);
+
+            const deltaA = vA - (state.fighterA.prevVotes || 0);
+            const deltaB = vB - (state.fighterB.prevVotes || 0);
+
+            // Player A Attacks
+            if (deltaA > 0 && (now - (state.fighterA.lastActionTime || 0)) > 400) {
+                const types = ['punch', 'kick', 'special'];
+                state.fighterA.animation = types[Math.floor(Math.random() * types.length)];
+                state.fighterA.lastActionTime = now;
+                const damage = 0.05 + (deltaA * 0.01);
+                state.fighterB.hp = Math.max(0, state.fighterB.hp - damage);
+                state.fighterB.lastHit = now;
+            }
+
+            // Player B Attacks
+            if (deltaB > 0 && (now - (state.fighterB.lastActionTime || 0)) > 400) {
+                const types = ['punch', 'kick', 'special'];
+                state.fighterB.animation = types[Math.floor(Math.random() * types.length)];
+                state.fighterB.lastActionTime = now;
+                const damage = 0.05 + (deltaB * 0.01);
+                state.fighterA.hp = Math.max(0, state.fighterA.hp - damage);
+                state.fighterA.lastHit = now;
+            }
+
+            state.fighterA.prevVotes = vA;
+            state.fighterB.prevVotes = vB;
+        }
+
         if (state.fighterA.animation !== 'idle' && (now - (state.fighterA.lastActionTime || 0)) > 600) {
             state.fighterA.animation = 'idle';
         }

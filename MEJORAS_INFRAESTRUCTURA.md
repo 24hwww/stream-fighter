@@ -14,10 +14,18 @@ Este documento resume las mejoras implementadas en el proyecto stream-fighter pa
 - ✅ Configuración de ESLint corregida para múltiples entornos
 - ✅ ESLint añadido a stream-socket
 
-**Resultados:**
-- **Antes:** 130 problemas (40 errores, 90 warnings)
-- **Después:** 80 problemas (6 errores, 74 warnings)
-- **Mejora:** 85% reducción de errores
+### 2. Puerto 3000 y 3010 (Docker & Forzado)
+
+**scripts/force-port.js:**
+- Mata procesos automáticamente en puertos específicos.
+- Filtra PID 1 y 0 para seguridad en Docker.
+- Soporta pasaje de puerto por argumento.
+
+**Mejoras Docker:**
+- ✅ **Puertos:** Backend movido a 3010, Frontend en 3000.
+- ✅ **Dependencias:** Añadidos `lsof` y `curl` para healthchecks.
+- ✅ **SPA Routing:** Corregido para Express 5 / `path-to-regexp` v8.
+- ✅ **Proxy:** Vite configurado para redireccionar `/api` al 3010.
 
 ### 2. Sistema de Logging Estructurado
 

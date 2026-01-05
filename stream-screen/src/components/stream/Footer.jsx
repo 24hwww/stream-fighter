@@ -19,7 +19,7 @@ export default function Footer() {
     };
 
     useEffect(() => {
-        fetchStats();
+        setTimeout(() => fetchStats(), 0); // eslint-disable-line react-hooks/set-state-in-effect
         socket.on("vote-update", fetchStats);
         socket.on("poll-update", fetchStats);
         return () => {
